@@ -1,0 +1,672 @@
+{
+    "schemaVersion": 1,
+    "id": "pent01",
+    "type": "square-grid-packing",
+    "meta": {
+        "name": "Pentominoes 6 x 10",
+        "author": "Traditional",
+        "description": "The twelve pentominoes tile a 6 x 10 rectangle exactly. There are 2339 distinct solutions, so any one of them will do.",
+        "tags": [
+            "pentominoes",
+            "classic",
+            "exact-fit"
+        ],
+        "attribution": "Public domain. The pentomino set predates modern puzzle publishing.",
+        "source": "Classic recreational mathematics problem.",
+        "license": "Public domain"
+    },
+    "field": {
+        "width": 19,
+        "height": 23
+    },
+    "container": {
+        "cells": [
+            [
+                4,
+                2
+            ],
+            [
+                5,
+                2
+            ],
+            [
+                6,
+                2
+            ],
+            [
+                7,
+                2
+            ],
+            [
+                8,
+                2
+            ],
+            [
+                9,
+                2
+            ],
+            [
+                10,
+                2
+            ],
+            [
+                11,
+                2
+            ],
+            [
+                12,
+                2
+            ],
+            [
+                13,
+                2
+            ],
+            [
+                4,
+                3
+            ],
+            [
+                5,
+                3
+            ],
+            [
+                6,
+                3
+            ],
+            [
+                7,
+                3
+            ],
+            [
+                8,
+                3
+            ],
+            [
+                9,
+                3
+            ],
+            [
+                10,
+                3
+            ],
+            [
+                11,
+                3
+            ],
+            [
+                12,
+                3
+            ],
+            [
+                13,
+                3
+            ],
+            [
+                4,
+                4
+            ],
+            [
+                5,
+                4
+            ],
+            [
+                6,
+                4
+            ],
+            [
+                7,
+                4
+            ],
+            [
+                8,
+                4
+            ],
+            [
+                9,
+                4
+            ],
+            [
+                10,
+                4
+            ],
+            [
+                11,
+                4
+            ],
+            [
+                12,
+                4
+            ],
+            [
+                13,
+                4
+            ],
+            [
+                4,
+                5
+            ],
+            [
+                5,
+                5
+            ],
+            [
+                6,
+                5
+            ],
+            [
+                7,
+                5
+            ],
+            [
+                8,
+                5
+            ],
+            [
+                9,
+                5
+            ],
+            [
+                10,
+                5
+            ],
+            [
+                11,
+                5
+            ],
+            [
+                12,
+                5
+            ],
+            [
+                13,
+                5
+            ],
+            [
+                4,
+                6
+            ],
+            [
+                5,
+                6
+            ],
+            [
+                6,
+                6
+            ],
+            [
+                7,
+                6
+            ],
+            [
+                8,
+                6
+            ],
+            [
+                9,
+                6
+            ],
+            [
+                10,
+                6
+            ],
+            [
+                11,
+                6
+            ],
+            [
+                12,
+                6
+            ],
+            [
+                13,
+                6
+            ],
+            [
+                4,
+                7
+            ],
+            [
+                5,
+                7
+            ],
+            [
+                6,
+                7
+            ],
+            [
+                7,
+                7
+            ],
+            [
+                8,
+                7
+            ],
+            [
+                9,
+                7
+            ],
+            [
+                10,
+                7
+            ],
+            [
+                11,
+                7
+            ],
+            [
+                12,
+                7
+            ],
+            [
+                13,
+                7
+            ]
+        ]
+    },
+    "rules": {
+        "allowRotation": true,
+        "allowFlip": true,
+        "completion": "all-pieces-contained"
+    },
+    "pieces": [
+        {
+            "id": "f",
+            "cells": [
+                [
+                    1,
+                    0
+                ],
+                [
+                    2,
+                    0
+                ],
+                [
+                    0,
+                    1
+                ],
+                [
+                    1,
+                    1
+                ],
+                [
+                    1,
+                    2
+                ]
+            ],
+            "color": "#e2574c",
+            "start": {
+                "x": 2,
+                "y": 14,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "i",
+            "cells": [
+                [
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    0
+                ],
+                [
+                    2,
+                    0
+                ],
+                [
+                    3,
+                    0
+                ],
+                [
+                    4,
+                    0
+                ]
+            ],
+            "color": "#e8833a",
+            "start": {
+                "x": 11,
+                "y": 9,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "l",
+            "cells": [
+                [
+                    0,
+                    0
+                ],
+                [
+                    0,
+                    1
+                ],
+                [
+                    0,
+                    2
+                ],
+                [
+                    0,
+                    3
+                ],
+                [
+                    1,
+                    3
+                ]
+            ],
+            "color": "#e3b53f",
+            "start": {
+                "x": 2,
+                "y": 9,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "n",
+            "cells": [
+                [
+                    1,
+                    0
+                ],
+                [
+                    1,
+                    1
+                ],
+                [
+                    0,
+                    2
+                ],
+                [
+                    1,
+                    2
+                ],
+                [
+                    0,
+                    3
+                ]
+            ],
+            "color": "#b5c94f",
+            "start": {
+                "x": 5,
+                "y": 9,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "p",
+            "cells": [
+                [
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    0
+                ],
+                [
+                    0,
+                    1
+                ],
+                [
+                    1,
+                    1
+                ],
+                [
+                    0,
+                    2
+                ]
+            ],
+            "color": "#6bbf59",
+            "start": {
+                "x": 14,
+                "y": 18,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "t",
+            "cells": [
+                [
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    0
+                ],
+                [
+                    2,
+                    0
+                ],
+                [
+                    1,
+                    1
+                ],
+                [
+                    1,
+                    2
+                ]
+            ],
+            "color": "#43b3a0",
+            "start": {
+                "x": 6,
+                "y": 14,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "u",
+            "cells": [
+                [
+                    0,
+                    0
+                ],
+                [
+                    2,
+                    0
+                ],
+                [
+                    0,
+                    1
+                ],
+                [
+                    1,
+                    1
+                ],
+                [
+                    2,
+                    1
+                ]
+            ],
+            "color": "#3f9fd4",
+            "start": {
+                "x": 10,
+                "y": 18,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "v",
+            "cells": [
+                [
+                    0,
+                    0
+                ],
+                [
+                    0,
+                    1
+                ],
+                [
+                    0,
+                    2
+                ],
+                [
+                    1,
+                    2
+                ],
+                [
+                    2,
+                    2
+                ]
+            ],
+            "color": "#5a7fd0",
+            "start": {
+                "x": 10,
+                "y": 14,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "w",
+            "cells": [
+                [
+                    0,
+                    0
+                ],
+                [
+                    0,
+                    1
+                ],
+                [
+                    1,
+                    1
+                ],
+                [
+                    1,
+                    2
+                ],
+                [
+                    2,
+                    2
+                ]
+            ],
+            "color": "#8a6cd1",
+            "start": {
+                "x": 14,
+                "y": 14,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "x",
+            "cells": [
+                [
+                    1,
+                    0
+                ],
+                [
+                    0,
+                    1
+                ],
+                [
+                    1,
+                    1
+                ],
+                [
+                    2,
+                    1
+                ],
+                [
+                    1,
+                    2
+                ]
+            ],
+            "color": "#bd63c4",
+            "start": {
+                "x": 2,
+                "y": 18,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "y",
+            "cells": [
+                [
+                    1,
+                    0
+                ],
+                [
+                    0,
+                    1
+                ],
+                [
+                    1,
+                    1
+                ],
+                [
+                    1,
+                    2
+                ],
+                [
+                    1,
+                    3
+                ]
+            ],
+            "color": "#dd6693",
+            "start": {
+                "x": 8,
+                "y": 9,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "z",
+            "cells": [
+                [
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    0
+                ],
+                [
+                    1,
+                    1
+                ],
+                [
+                    1,
+                    2
+                ],
+                [
+                    2,
+                    2
+                ]
+            ],
+            "color": "#9c8b7a",
+            "start": {
+                "x": 6,
+                "y": 18,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        }
+    ],
+    "presentation": {
+        "fieldRotation": 0
+    }
+}

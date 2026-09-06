@@ -1,0 +1,232 @@
+{
+    "schemaVersion": 1,
+    "id": "demo01",
+    "type": "square-grid-packing",
+    "meta": {
+        "name": "Corner Stone",
+        "author": "Illo",
+        "description": "One piece is already fixed in the corner. Fit the other three around it; four cells are meant to stay empty.",
+        "tags": [
+            "demo",
+            "locked",
+            "slack"
+        ],
+        "attribution": "",
+        "source": "Written to exercise locked pieces and positive slack.",
+        "license": "Public domain"
+    },
+    "field": {
+        "width": 10,
+        "height": 14
+    },
+    "container": {
+        "cells": [
+            [
+                2,
+                2
+            ],
+            [
+                3,
+                2
+            ],
+            [
+                4,
+                2
+            ],
+            [
+                5,
+                2
+            ],
+            [
+                6,
+                2
+            ],
+            [
+                2,
+                3
+            ],
+            [
+                3,
+                3
+            ],
+            [
+                4,
+                3
+            ],
+            [
+                5,
+                3
+            ],
+            [
+                6,
+                3
+            ],
+            [
+                2,
+                4
+            ],
+            [
+                3,
+                4
+            ],
+            [
+                4,
+                4
+            ],
+            [
+                5,
+                4
+            ],
+            [
+                6,
+                4
+            ],
+            [
+                2,
+                5
+            ],
+            [
+                3,
+                5
+            ],
+            [
+                4,
+                5
+            ],
+            [
+                5,
+                5
+            ],
+            [
+                6,
+                5
+            ]
+        ]
+    },
+    "rules": {
+        "allowRotation": true,
+        "allowFlip": false,
+        "completion": "all-pieces-contained"
+    },
+    "pieces": [
+        {
+            "id": "anchor",
+            "cells": [
+                [
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    0
+                ],
+                [
+                    0,
+                    1
+                ],
+                [
+                    1,
+                    1
+                ]
+            ],
+            "color": "#9c8b7a",
+            "start": {
+                "x": 2,
+                "y": 2,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": true
+        },
+        {
+            "id": "bar",
+            "cells": [
+                [
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    0
+                ],
+                [
+                    2,
+                    0
+                ],
+                [
+                    3,
+                    0
+                ]
+            ],
+            "color": "#3f9fd4",
+            "start": {
+                "x": 2,
+                "y": 7,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "ell",
+            "cells": [
+                [
+                    0,
+                    0
+                ],
+                [
+                    0,
+                    1
+                ],
+                [
+                    0,
+                    2
+                ],
+                [
+                    1,
+                    2
+                ]
+            ],
+            "color": "#e3b53f",
+            "start": {
+                "x": 2,
+                "y": 9,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "tee",
+            "cells": [
+                [
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    0
+                ],
+                [
+                    2,
+                    0
+                ],
+                [
+                    1,
+                    1
+                ]
+            ],
+            "color": "#6bbf59",
+            "start": {
+                "x": 5,
+                "y": 9,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        }
+    ],
+    "presentation": {
+        "fieldRotation": 0
+    }
+}
