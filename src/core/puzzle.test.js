@@ -202,7 +202,7 @@ describe('state operations', () => {
         expect(state.placements.a.rotation).toBe(0);
     });
 
-    it('clamps a placement that would leave the field', () => {
+    it('clamps a runtime placement to the expanded workspace', () => {
         const def = makeDef();
         const state = setPlacement(def, createState(def), 'a', {
             x: 99,
@@ -211,6 +211,6 @@ describe('state operations', () => {
             flipped: false
         });
 
-        expect(state.placements.a).toMatchObject({ x: 10, y: 11 });
+        expect(state.placements.a).toMatchObject({ x: 14, y: 15 });
     });
 });

@@ -6,7 +6,8 @@
 // by returning the state unchanged. They never refuse a placement for being
 // invalid — overlapping and out-of-tray placements are permitted and marked.
 
-import { clampToField, findPiece, orientedBounds } from './puzzle.js';
+import { findPiece, orientedBounds } from './puzzle.js';
+import { snapPlacement } from './workspace.js';
 
 export function createState(def) {
     const placements = {};
@@ -28,12 +29,18 @@ export function setPlacement(def, state, pieceId, placement) {
     const piece = findPiece(def, pieceId);
 
     if (!piece || piece.locked) return state;
+    if (!placement || !Number.isFinite(placement.x) || !Number.isFinite(placement.y)
+        || !Number.isInteger(placement.rotation) || placement.rotation < 0 || placement.rotation > 3
+        || typeof placement.flipped !== 'boolean') return state;
+    const current = state.placements[pieceId];
+    if (def.rules.allowRotation === false && placement.rotation !== current.rotation) return state;
+    if (def.rules.allowFlip !== true && placement.flipped !== current.flipped) return state;
 
     return {
         ...state,
         placements: {
             ...state.placements,
-            [pieceId]: clampToField(def, piece, placement)
+            [pieceId]: snapPlacement(def, piece, placement)
         }
     };
 }

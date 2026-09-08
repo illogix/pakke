@@ -3,6 +3,7 @@
 // The same function runs over the bundled set as a test, which is what actually
 // keeps a broken puzzle from shipping.
 
+import { structuralErrors } from './structure.js';
 import { cellKey, isConnected } from './geometry.js';
 import {
     SCHEMA_VERSION,
@@ -21,8 +22,9 @@ import { computeViolations } from './violations.js';
 const ID_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
 
 export function validatePuzzle(def) {
-    const errors = [];
+    const errors = structuralErrors(def);
     const warnings = [];
+    if (errors.length) return { errors, warnings, facts: {}, valid: false };
 
     if (def?.schemaVersion !== SCHEMA_VERSION) {
         errors.push(`schemaVersion must be ${SCHEMA_VERSION}, got ${def?.schemaVersion}`);

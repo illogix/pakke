@@ -1,33 +1,23 @@
 import Phaser from 'phaser';
-
 import PlayScene from './scenes/PlayScene.js';
-import { puzzleById, puzzles } from './puzzles/index.js';
+import { Shell } from './app/shell.js';
 import { theme } from './ui/theme.js';
+import './style.css';
 
-// There is no menu yet, so `?puzzle=<id>` picks one and the first in id order is
-// the default. A menu replaces this later, but the param is worth keeping as a
-// way to link straight to a puzzle.
-const requested = new URLSearchParams(window.location.search).get('puzzle');
-const def = puzzleById(requested) ?? puzzles[0];
-
-const config = {
-    type: Phaser.AUTO,
-    parent: 'game',
-    backgroundColor: theme.page,
-    // The ScaleManager maps canvas to window and nothing else. Fitting a
-    // puzzle's field inside that canvas is per-puzzle, so the scene owns it.
-    scale: {
-        mode: Phaser.Scale.RESIZE,
-        width: '100%',
-        height: '100%'
-    },
-    scene: []
-};
-
-const game = new Phaser.Game(config);
-
-// Added rather than listed in `scene`, because the array form auto-starts the
-// first scene with no data. The menu will hand over a definition the same way.
-game.scene.add('Play', PlayScene, true, { def });
-
+const shell = new Shell();
+const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+const host = document.querySelector('#game');
+const game = new Phaser.Game({
+    type: Phaser.AUTO, parent: 'game', backgroundColor: theme.page,
+    // Native Pointer Events provide capture/cancel ownership across mouse and touch.
+    input: { mouse: false, touch: false, keyboard: false },
+    // ResizeObserver measures the DOM viewport; render at up to 2x for crisp mobile edges.
+    scale: { parent: 'game', expandParent: false, mode: Phaser.Scale.NONE,
+        width: host.clientWidth * pixelRatio, height: host.clientHeight * pixelRatio, zoom: 1 / pixelRatio },
+    render: { antialias: true, roundPixels: false },
+    scene: [],
+    callbacks: { preBoot(game) { game.registry.set('shell',shell); game.registry.set('pixelRatio',pixelRatio); } }
+});
+game.scene.add('Play',PlayScene,false);
+shell.connect(game);
 export default game;

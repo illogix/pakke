@@ -112,3 +112,26 @@ function expectCursorHeld(cells, rotation, flipped, transform) {
         );
     }
 }
+
+// Fractional grab points must use edge coordinates, including under field rotation.
+it('continuous grab transforms preserve interior points across turns and flips', async () => {
+    const { rotatedGrabPoint, flippedGrabPoint } = await import('./interaction.js');
+    for (const cells of [[[0,0],[1,0],[2,0],[3,0]],[[0,0],[0,1],[0,2],[1,2]]]) {
+        const target=piece('p',cells,8,8);
+        for(let rotation=0;rotation<4;rotation++) for(const flipped of [false,true]) {
+            const start={x:0,y:0,rotation,flipped};
+            for(const [x,y] of placedCells(target,start)) {
+                const grab=[x+.27,y+.81],box=orientedBounds(target,start);
+                for(const dir of [-1,1]) {
+                    const next=rotatedGrabPoint(box,grab,dir);
+                    const after=placedCells(target,{...start,rotation:(rotation+dir+4)%4});
+                    expect(after.map(c=>c.join(','))).toContain([Math.floor(next[0]),Math.floor(next[1])].join(','));
+                    const inverse=rotatedGrabPoint(orientedBounds(target,{...start,rotation:(rotation+dir+4)%4}),next,-dir);
+                    expect(inverse[0]).toBeCloseTo(grab[0]);expect(inverse[1]).toBeCloseTo(grab[1]);
+                }
+                const next=flippedGrabPoint(box,grab,rotation);
+                expect(placedCells(target,{...start,flipped:!flipped}).map(c=>c.join(','))).toContain([Math.floor(next[0]),Math.floor(next[1])].join(','));
+            }
+        }
+    }
+});

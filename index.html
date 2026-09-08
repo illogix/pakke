@@ -2,29 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Phaser Game</title>
-    <style>
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        background: #1b1b25;
-      }
-
-      #game {
-        width: 100%;
-        height: 100%;
-      }
-
-      canvas {
-        display: block;
-      }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#f4f2ee" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Packing Puzzle</title>
   </head>
   <body>
-    <div id="game"></div>
+    <main id="app">
+      <div id="game" aria-label="Packing puzzle canvas"></div>
+      <footer id="controls" hidden></footer>
+      <section id="screen" aria-label="Home" hidden></section>
+    </main>
+    <dialog id="sheet" aria-labelledby="sheet-title"><div class="sheet-content"></div></dialog>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

@@ -44,3 +44,11 @@ export function rotatedGrab({ width, height }, [gx, gy], direction) {
 export function flippedGrab({ width, height }, [gx, gy], rotation) {
     return rotation % 2 === 0 ? [width - 1 - gx, gy] : [gx, height - 1 - gy];
 }
+
+/** Continuous points rotate about box edges, unlike cell indices above. */
+export function rotatedGrabPoint({ width, height }, [x, y], direction) {
+    return direction > 0 ? [height - y, x] : [y, width - x];
+}
+export function flippedGrabPoint({ width, height }, [x, y], rotation) {
+    return rotation % 2 === 0 ? [width - x, y] : [x, height - y];
+}

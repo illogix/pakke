@@ -1,4 +1,4 @@
-// Violations are the marked-in-red state: placements the puzzle permits but
+// Violations are the conflict state: placements the puzzle permits but
 // which cannot be part of a solution. Drops always succeed, so this is what
 // tells the player something is wrong, and it is also half of the solved check.
 

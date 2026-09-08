@@ -113,9 +113,7 @@ export function createLayout({
     };
 }
 
-/** Bottom strip in portrait, side strip in landscape. */
+/** Controls stay below the viewport in every orientation. */
 export function panelFor(viewport, theme) {
-    return viewport.width >= viewport.height
-        ? { side: 'right', thickness: theme.panelThicknessLandscape }
-        : { side: 'bottom', thickness: theme.panelThickness };
+    return { side: 'bottom', thickness: theme.panelThickness };
 }

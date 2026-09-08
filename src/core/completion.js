@@ -45,3 +45,13 @@ export function isSolved(def, state) {
 export function completionLabel(def) {
     return COMPLETION_LABELS[def.rules.completion] ?? def.rules.completion;
 }
+
+/** Player-facing progress excludes every piece involved in a conflict. */
+export function validProgress(def, state) {
+    const keys = containerKeys(def);
+    const violations = computeViolations(def, state);
+    return { contained: def.pieces.filter(piece => !violations.pieces.has(piece.id)
+        && state.placements[piece.id]
+        && containment(piece, state.placements[piece.id], keys) === 'contained').length,
+        total: def.pieces.length };
+}
