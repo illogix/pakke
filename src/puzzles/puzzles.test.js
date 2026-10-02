@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { deriveField, slack } from '../core/puzzle.js';
 import { validatePuzzle, validateSet } from '../core/validate.js';
-import { nextPuzzle, puzzleById, puzzles } from './index.js';
+import { bundledPacks, nextPuzzle, puzzleById, puzzles } from './index.js';
 
 // The sweep that actually keeps a broken puzzle from shipping. Everything the
 // editor would warn about at authoring time is checked here at build time.
@@ -16,11 +16,11 @@ describe('the bundled set', () => {
         expect(validateSet(puzzles).errors).toEqual([]);
     });
 
-    it('is ordered by id, which is what "next puzzle" walks', () => {
-        const ids = puzzles.map((def) => def.id);
-
-        expect(ids).toEqual([...ids].sort());
-        expect(nextPuzzle(ids[ids.length - 1])).toBeNull();
+    it('uses explicit pack order and never advances into another pack', () => {
+        expect(bundledPacks[0].puzzles.map(d => d.id)).toEqual(['first-fit', 'little-turn', 'other-side', 'demo01']);
+        expect(nextPuzzle('other-side', 'first-steps').id).toBe('demo01');
+        expect(nextPuzzle('demo01', 'first-steps')).toBeNull();
+        expect(nextPuzzle('pent01', 'classics')).toBeNull();
     });
 
     it.each(puzzles.map((def) => [def.id, def]))('%s validates cleanly', (_id, def) => {

@@ -83,14 +83,26 @@ export function flipPiece(def, state, pieceId) {
     return setPlacement(def, state, pieceId, recentre(piece, current, next));
 }
 
-/** Keep the bounding-box centre fixed across an orientation change. */
+/**
+ * Keep the bounding-box centre fixed across an orientation change.
+ *
+ * A piece with an oblong box — a 2x3 L, a 1x4 bar — cannot turn about its exact
+ * centre, because the centre of the 3x2 box it becomes sits half a cell away, so
+ * half a cell always has to be rounded off. Rounding by the direction the box
+ * grows rounds every turn the same way and walks the piece a cell down-right per
+ * half turn. Rounding by the parity of the target rotation instead gives the
+ * even rotations one anchor and the odd rotations another: a turn and its
+ * opposite cancel exactly, and two turns always land back in the same box.
+ */
 function recentre(piece, current, next) {
     const before = orientedBounds(piece, current);
     const after = orientedBounds(piece, next);
+    // ceil(-n) === -floor(n), which is what makes the two anchors exact inverses.
+    const round = next.rotation % 2 === 0 ? Math.floor : Math.ceil;
 
     return {
         ...next,
-        x: current.x + Math.round((before.width - after.width) / 2),
-        y: current.y + Math.round((before.height - after.height) / 2)
+        x: current.x + round((before.width - after.width) / 2),
+        y: current.y + round((before.height - after.height) / 2)
     };
 }

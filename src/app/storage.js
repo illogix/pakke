@@ -2,6 +2,8 @@ import { createState } from '../core/state.js';
 import { clampToWorkspace } from '../core/workspace.js';
 import { isSolved } from '../core/completion.js';
 
+// Retained for V1 migration and the player's preference mirror. New library
+// content and attempts live in the IndexedDB repository.
 const PREFIX = 'packing:v2:';
 // Definition identity, independent of filenames and object key insertion order.
 export function fingerprint(def) {

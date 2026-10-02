@@ -5,3 +5,8 @@ export * from './violations.js';
 export * from './completion.js';
 export * from './validate.js';
 export * from './workspace.js';
+export * from './random.js';
+export * from './shapes.js';
+export * from './solver.js';
+export * from './partition.js';
+export * from './generate.js';

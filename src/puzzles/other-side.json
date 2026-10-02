@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "id": "other-side",
+  "type": "square-grid-packing",
+  "meta": {
+    "name": "The other side",
+    "author": "Pakke",
+    "description": "This shape needs to be flipped. Select it, then use the flip control below the board.",
+    "tags": [
+      "introduction"
+    ],
+    "source": "Original introductory puzzle."
+  },
+  "container": {
+    "cells": [
+      [
+        3,
+        2
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        2,
+        4
+      ]
+    ]
+  },
+  "rules": {
+    "allowRotation": true,
+    "allowFlip": true,
+    "completion": "all-pieces-contained"
+  },
+  "pieces": [
+    {
+      "id": "a",
+      "cells": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "color": "#c78f79",
+      "start": {
+        "x": 2,
+        "y": 6,
+        "rotation": 0,
+        "flipped": false
+      },
+      "locked": false
+    }
+  ],
+  "presentation": {
+    "fieldRotation": 0
+  },
+  "field": {
+    "width": 6,
+    "height": 11
+  }
+}

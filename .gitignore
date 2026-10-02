@@ -3,3 +3,9 @@ dist/
 .DS_Store
 *.log
 .vite/
+
+# Regenerated browser verification captures; documentation lives in docs/*.md.
+docs/verification/
+
+# Planning notes and redesign briefs, kept local rather than in the repo.
+plans/

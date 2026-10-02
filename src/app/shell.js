@@ -1,8 +1,11 @@
-import { icon, iconButton } from '../ui/icons.js';
+import { iconButton } from '../ui/icons.js';
 import { storage } from './storage.js';
-import { puzzles, puzzleById, nextPuzzle } from '../puzzles/index.js';
+import { bundledPacks } from '../puzzles/index.js';
+import { LibraryRepository, openDatabase } from '../library/repository.js';
+import { allEntries, entries, collections, saveAttempt, statusOf } from '../library/model.js';
+import { LibraryUI } from './library-ui.js';
+import { prepareOffline } from './offline.js';
 import { validatePuzzle } from '../core/validate.js';
-import { bounds } from '../core/geometry.js';
 import { slack } from '../core/puzzle.js';
 
 const text = (tag,value,className='') => { const e=document.createElement(tag);e.textContent=value;e.className=className;return e; };
@@ -13,15 +16,45 @@ export class Shell {
         this.dialog.addEventListener('close',()=>this.returnFocus?.focus());
         window.addEventListener('popstate',()=>this.route());
     }
-    connect(game) { this.game=game; game.events.once('ready',()=>requestAnimationFrame(()=>this.route())); }
+    connect(game) {
+        this.game=game;
+        game.events.once('ready',()=>requestAnimationFrame(()=>this.initialize()));
+    }
+    async initialize() {
+        this.screen.hidden=false;this.screen.replaceChildren(text('p','Opening your library…'));
+        try {
+            let backend;
+            try { backend=await openDatabase(); } catch (error) { this.storageNotice=`Local storage is unavailable. Bundled puzzles can be played temporarily; changes will not be saved. ${error.message}`; }
+            this.repo=await new LibraryRepository(backend).initialize(bundledPacks,storage);
+            this.library=new LibraryUI(this,this.repo);this.library.syncPreferences();this.ready=true;this.route();
+            prepareOffline(message=>{this.offlineStatus=message;if(this.library.offlineLabel)this.library.offlineLabel.textContent=message;});
+        } catch(error) {
+            this.screen.replaceChildren(text('h1','Your library could not open'),text('p',error.message),text('p','Your existing data has not been replaced. Try closing other game tabs and reloading.'));
+        }
+    }
     scene() { return this.game.scene.isActive('Play') ? this.game.scene.getScene('Play') : null; }
     route() {
-        const id=new URLSearchParams(location.search).get('puzzle');
-        if(id!==null) this.open(puzzleById(id),false); else this.home(false);
+        if(!this.ready)return;
+        const params=new URLSearchParams(location.search),id=params.get('puzzle'),packId=params.get('pack'),key=params.get('revision');
+        if(id!==null) {
+            let matches=(packId?entries(this.repo.state,packId):allEntries(this.repo.state)).filter(e=>e.def.id===id&&(!key||e.key===key));
+            matches=[...new Map(matches.map(e=>[e.key,e])).values()];
+            if(matches.length===1)this.open(matches[0].def,false,packId,matches[0].key);
+            else {
+                this.library.browse(null,false);
+                this.showSheet(matches.length?'Choose a puzzle revision':'Puzzle unavailable',body=>{
+                    body.append(text('p',matches.length?'This puzzle has several installed versions. Choose a collection to continue.':'That puzzle or collection is not installed. Import its pack to use this link.'));
+                    for(const record of matches)body.append(this.library.puzzleCard(record,true));
+                });
+            }
+        } else this.library.browse(packId,false);
     }
-    url(id, push=true) {
-        const url=new URL(location.href); if(id) url.searchParams.set('puzzle',id); else url.searchParams.delete('puzzle');
-        if(push) history.pushState(null,'',url);
+    url(id, push=true, packId=null, key=null) {
+        const url=new URL(location.href);
+        for(const [name,value] of [['puzzle',id],['pack',packId],['revision',key]]) {
+            if(value)url.searchParams.set(name,value);else url.searchParams.delete(name);
+        }
+        if(push)history.pushState(null,'',url);
     }
     closeSheet() { if(this.dialog.open)this.dialog.close(); }
     showSheet(title,fill) {
@@ -31,7 +64,11 @@ export class Shell {
         header.append(h,iconButton('close','Close',()=>this.closeSheet()));this.content.append(header);fill(this.content);
         if(!this.dialog.open)this.dialog.showModal();
     }
-    open(def,push=true) {
+    open(def,push=true,context=null,key=null) {
+        if(!this.ready)return;
+        this.library.remember();
+        this.record=key?this.repo.state.definitions[key]:Object.values(this.repo.state.definitions).find(r=>r.def.id===def?.id);
+        this.context=context;
         this.closeSheet();this.game.scene.stop('Play');
         if(!def || !validatePuzzle(def).valid) {
             this.home(false);this.showSheet('Puzzle unavailable',body=>{
@@ -39,15 +76,19 @@ export class Shell {
                 body.append(iconButton('puzzles','Choose a puzzle',()=>this.selector()));
             });return;
         }
-        this.def=def;this.url(def.id,push);this.screen.hidden=true;this.footer.hidden=false;
+        this.def=def;this.url(def.id,push,context,this.record?.key);this.screen.hidden=true;this.footer.hidden=false;
         document.querySelector('#game').removeAttribute('inert');
         this.buildDock(def);
-        const saved=storage.load(def);
-        storage.write('last',def.id);
+        // Apply the measured player viewport before the first scene frame.
+        // ResizeObserver still handles later orientation and window changes.
+        const host=document.querySelector('#game'),ratio=this.game.registry.get('pixelRatio') || 1;
+        this.game.scale.resize(host.clientWidth*ratio,host.clientHeight*ratio);
+        const saved=this.repo.state.progress[this.record?.gameKey];
+        if(saved)this.committed(def,saved.state);
         this.game.scene.start('Play',{def,state:saved?.state,shell:this});
-        if(!storage.read('help-seen')) {
+        if(!this.repo.state.preferences['help-seen']) {
             // Defer until the scene is booted; the dialog also blocks board input.
-            requestAnimationFrame(()=>this.help());
+            requestAnimationFrame(()=>{if(this.def===def&&this.scene())this.help();});
         }
     }
     buildDock(def) {
@@ -80,18 +121,34 @@ export class Shell {
         this.buttons.reframe.hidden=initial;
         this.detail.textContent=conflict ? 'Selected piece needs adjustment: overlapping or partly outside the tray.' : selected ? 'Piece selected.' : '';
     }
-    committed(def,state) {storage.save(def,state);}
-    completion(def) {
-        this.showSheet('Beautifully fitted.',body=>{
-            body.append(text('p','Every piece has found its place.'));
+    committed(def,state) {
+        const key=this.record?.key,context=this.context;
+        if(!this.repo.backend) {
+            this.repo.state=saveAttempt(this.repo.state,key,state,context);
+            return; // Explicitly announced temporary play, never a successful install.
+        }
+        this.pendingSave=this.repo.mutate(s=>saveAttempt(s,key,state,context)).then(()=>true).catch(error=>{
+            this.storageNotice=`Your latest attempt could not be saved. ${error.message}`;
+            this.library.error(new Error(this.storageNotice));
+            return false;
+        });
+    }
+    async completion(def) {
+        const saved=await this.pendingSave;
+        if(saved===false||this.def!==def)return;
+        const pack=collections(this.repo.state).find(p=>p.id===this.context);
+        const sequence=entries(this.repo.state,this.context),index=sequence.findIndex(e=>e.key===this.record?.key),next=index>=0?sequence[index+1]:null;
+        const remaining=sequence.filter(e=>statusOf(this.repo.state,e)!=='Solved').length;
+        this.showSheet(pack&&remaining===0?'Collection complete.':'Beautifully fitted.',body=>{
+            body.append(text('p',pack&&remaining===0?`Every puzzle in ${pack.name} has found its place.`:pack?`Every piece has found its place. ${remaining} puzzle${remaining===1?'':'s'} left in this collection.`:'Every piece has found its place.'));
             const row=document.createElement('div');row.className='sheet-actions';
-            row.append(iconButton('home','Home',()=>this.home()),iconButton('puzzles','Choose a puzzle',()=>this.selector()));
-            const next=nextPuzzle(def.id);if(next)row.append(iconButton('next','Next puzzle',()=>this.open(next)));
+            row.append(this.library.action(pack?'Return to pack':'Return to library',()=>this.selector()));
+            if(next)row.append(this.library.action('Next puzzle',()=>this.library.play(next),'text-button primary'));
             body.append(row);
         });
     }
     help() {
-        storage.write('help-seen',true);
+        if(this.repo.backend)this.library.preference('help-seen',true).catch(()=>{});
         this.showSheet('A place for every piece',body=>{
             for(const [title,copy] of [
                 ['Move naturally','Drag a piece; it follows your finger and settles onto the grid when released.'],
@@ -106,51 +163,7 @@ export class Shell {
             }
         });
     }
-    selector() {
-        this.showSheet('Choose a puzzle',body=>{
-            const list=document.createElement('div');list.className='puzzle-list';
-            if(!puzzles.length)list.append(text('p','No puzzles are available.'));
-            for(const def of puzzles) {
-                const valid=validatePuzzle(def).valid, card=document.createElement('button');card.type='button';card.className='puzzle-card';card.disabled=!valid;
-                card.append(this.thumbnail(def,valid));
-                const words=document.createElement('span');words.append(text('strong',def.meta?.name??def.id));
-                words.append(text('small',`${def.meta?.author || 'Original puzzle'} · Square-grid packing`));
-                words.append(text('small','Fit every piece into the tray'));
-                words.append(text('small',!valid?'Unavailable':storage.solved(def.id)?'Solved':storage.load(def)?'In progress':`${def.pieces.length} pieces`,'card-status'));
-                card.append(words);card.addEventListener('click',()=>this.open(def));list.append(card);
-            }
-            body.append(list,iconButton('home','Home',()=>this.home()));
-        });
-    }
-    thumbnail(def,valid) {
-        const canvas=document.createElement('canvas');canvas.className='thumbnail';canvas.width=144;canvas.height=112;canvas.setAttribute('aria-hidden','true');
-        if(!valid)return canvas;const ctx=canvas.getContext('2d');const b=bounds(def.container.cells);const size=Math.min(120/b.width,88/b.height);
-        ctx.fillStyle='#d8dcd3';for(const [x,y] of def.container.cells)ctx.fillRect(12+(x-b.minX)*size,12+(y-b.minY)*size,size-1,size-1);
-        return canvas;
-    }
-    home(push=true) {
-        this.closeSheet();this.game.scene.stop('Play');this.def=null;this.url(null,push);
-        this.footer.hidden=true;this.screen.hidden=false;document.querySelector('#game').setAttribute('inert','');
-        this.screen.replaceChildren();const card=document.createElement('div');card.className='home-card';
-        const mark=document.createElement('div');mark.className='home-mark';mark.innerHTML='<i></i><i></i><i></i><i></i>';
-        card.append(mark,text('h1','A little room to think.'),text('p','Arrange the pieces. Find their place.'));
-        const choices=document.createElement('div');choices.className='home-choices';
-        const last=puzzleById(storage.read('last'));if(last&&storage.load(last))choices.append(this.homeAction('play','Resume puzzle',()=>this.open(last)));
-        choices.append(this.homeAction('puzzles','Choose a puzzle',()=>this.selector()),this.homeAction('settings','Settings',()=>this.settings()));
-        card.append(choices);this.screen.append(card);
-    }
-    homeAction(name,label,run) {
-        const b=document.createElement('button');b.type='button';b.className='home-action';b.innerHTML=icon(name);b.append(text('span',label));b.addEventListener('click',run);return b;
-    }
-    settings() {
-        this.showSheet('Settings',body=>{
-            body.append(text('p','Progress is saved in this browser on this device.'));
-            const label=document.createElement('label');label.className='preference';const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=storage.read('reduced-motion')===true;
-            checkbox.addEventListener('change',()=>storage.write('reduced-motion',checkbox.checked));label.append(checkbox,document.createTextNode('Reduce motion'));body.append(label);
-            body.append(this.homeAction('restart','Clear saved progress',()=>this.showSheet('Clear all progress?',content=>{
-                content.append(text('p','This removes saved attempts and solved history for every puzzle in this browser.'));
-                content.append(iconButton('restart','Confirm clear all progress',()=>{storage.clear(puzzles);this.home();}));
-            })));
-        });
-    }
+    async selector() { await this.pendingSave;this.library.browse(this.context); }
+    home(push=true) { this.library.browse(null,push); }
+    settings() { this.library.settings(); }
 }

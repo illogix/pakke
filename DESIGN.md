@@ -1,380 +1,264 @@
-# 2D Packing Puzzle — V1 Design
+# Pakke — current design
 
-Design record from the 2026-07-24/25 discussion. Captures decisions that are
-settled, the puzzle schema as it currently stands, and the questions still open.
+Current as of September 14, 2026. This is the authoritative product and gameplay
+reference. It describes the implemented player and library. See
+[the library format reference](docs/LIBRARY_FORMAT.md) for exchange and storage
+contracts, and [verification](docs/VERIFICATION.md) for checks and their limits.
+Remaining work and optional extensions are tracked outside this repo.
 
-**Built so far:** the core and its tests, two bundled puzzles, the player scene,
-and selection plus the actions panel. Not yet built: home screen, puzzle menu,
-localStorage progress, the solve popup, and the editor. With no menu, `?puzzle=`
-picks a puzzle and the first in id order is the default.
+## Product and scope
 
-## Scope
+A mobile-first square-grid packing game, also playable in a local desktop
+browser. Arrange polyomino pieces in a fixed tray using movement, quarter-turns,
+and optional flipping. Play is untimed, with no score or move counter.
 
-V1 is **square-grid packing puzzles only**: a fixed tray of square cells, a set
-of polyomino pieces, grid-snapped movement, 90° rotation, optional flipping.
-Solved when every piece sits inside the tray.
+The player uses continuous dragging, release snapping, an aligned canvas,
+subtle materials, and a bottom icon dock. The local library supports bundled
+and imported collections, resume, search, status filters, export, backups, and
+production offline play. No account or server is needed.
 
-The point of V1 is not breadth. It is to establish a player, an editor, and a
-puzzle-definition format that later mechanics can extend without invalidating
-puzzles already authored.
+Five bundled puzzles are arranged in two explicit collections:
 
-**Explicitly not in V1:** solver, solution counting, generator, puzzle packs,
-calendar/variable-target puzzles, restricted entry, collision-constrained
-sliding, anti-slide validation, colour-contact rules, non-square geometry,
-continuous rotation, physics, custom executable rules.
+- **First steps:** `first-fit`, `little-turn`, `other-side`, `demo01`. The first
+  three introduce placement, rotation, and flipping; the demo adds a locked
+  piece and intentional spare room.
+- **Room to think:** `pent01`, the larger pentomino challenge.
 
-## Architecture
+The library can also **generate** new puzzles on the device; see
+[Generated puzzles](#generated-puzzles). The editor is a possible future
+feature, not a prerequisite or an implemented screen. Native mobile packaging
+is also not implemented.
 
-The load-bearing constraint: **the puzzle is fully represented outside Phaser.**
+## Architecture and state boundaries
 
-- **`core/`** — pure JS, zero Phaser imports. Cell geometry, schema, placement
-  state, legal-move checks, validation, completion. Runs in Node, so it is
-  unit-testable and a future solver links against it directly.
-- **`puzzles/`** — JSON definitions, hand-inspectable, `schemaVersion`-stamped.
-- **Phaser scenes** — view and input adapter. Translates pointer events into
-  core operations and core state into rendered cells. Owns pixels; owns nothing
-  else.
+The puzzle is fully represented outside Phaser. Rendering must never become
+the source of truth for piece placements or rules.
 
-If Phaser objects ever become the source of truth for where a piece is,
-everything in the post-V1 list gets expensive.
+| Layer | Responsibility |
+| --- | --- |
+| `src/core/` | Pure geometry, committed state operations, violations, completion, validation, and the solver/generator. No Phaser imports. |
+| `src/puzzles/` | Bundled JSON definitions and an explicitly ordered pack manifest. |
+| `src/library/` | Definition identity, file validation, collections, saved attempts, backups, and the IndexedDB repository. No Phaser imports. |
+| `src/ui/` | Camera and gesture math, theme, procedural materials, silhouettes, and icons. Some rendering helpers use browser canvas/DOM APIs. |
+| `src/scenes/` | Phaser drawing, event wiring, transient selection and gesture previews. |
+| `src/app/` | Library pages, player controls/dialogs, routing, offline registration, legacy storage migration, and the generator sheet with its Web Worker. |
 
-## Data model
+Keep these concepts separate:
 
-Two separate things: a **definition** (static JSON, never mutated) and a
-**state** (runtime, mutable, owned by the core).
+- **Definition:** immutable authored JSON describing a puzzle.
+- **Attempt:** committed integer placements plus saved solve history.
+- **View state:** selection, camera, fractional drag preview, and animation.
+- **Pack:** an ordered collection referencing exact definition versions.
+- **Draft:** reserved authoring data; it is neither an attempt nor playable
+  library content. No draft editor or stable draft exchange format exists yet.
+
+Core operations return new state objects. Future authoring should likewise use
+named operations so history/undo can be added without restructuring event code.
+
+## Puzzle definition
+
+The supported puzzle schema is version 1. A minimal complete example:
 
 ```json
 {
   "schemaVersion": 1,
-  "id": "a7f3c1e2",
+  "id": "example-domino",
   "type": "square-grid-packing",
-
   "meta": {
-    "name": "…",
-    "author": "…",
-    "description": "…",
-    "tags": [],
-    "attribution": "…",
-    "source": "…",
-    "license": "…"
+    "name": "A place to start",
+    "author": "Your name",
+    "description": "Move the piece into the tray."
   },
-
-  "field": { "width": 20, "height": 14 },
-  "container": { "cells": [[8, 4], [9, 4], [10, 4]] },
-
+  "field": { "width": 6, "height": 8 },
+  "container": { "cells": [[2, 2], [3, 2]] },
   "rules": {
     "allowRotation": true,
     "allowFlip": false,
     "completion": "all-pieces-contained"
   },
-
-  "pieces": [
-    {
-      "id": "p1",
-      "cells": [[0, 0], [0, 1], [0, 2], [1, 2]],
-      "color": "#e0564a",
-      "start": { "x": 2, "y": 3, "rotation": 0, "flipped": false },
-      "locked": false
-    }
-  ],
-
+  "pieces": [{
+    "id": "p1",
+    "cells": [[0, 0], [1, 0]],
+    "color": "#629daf",
+    "start": { "x": 2, "y": 5, "rotation": 0, "flipped": false },
+    "locked": false
+  }],
   "presentation": { "fieldRotation": 0 }
 }
 ```
 
-```
-State = { placements: { "p1": { x, y, rotation, flipped }, … } }
-```
+An attempt contains `placements`, keyed by piece ID, with `{x, y, rotation,
+flipped}` for each piece. Rotation is 0–3 clockwise quarter-turns. Geometry
+flips horizontally first, then rotates, then translates into canonical field
+coordinates. Occupied cell arrays are derived rather than saved.
 
-### Terms
+IDs are permanent identity, independent of names, filenames, and play order.
+Never rename an ID merely to reorder a collection. Designer, contributor,
+source, attribution, license, tags, and catalog numbers belong in metadata;
+optional credits are not a prerequisite for a private puzzle.
 
-- **Placement** — the four numbers describing where a piece is and how it is
-  turned: `{ x, y, rotation: 0–3, flipped: bool }`. `start` is the initial
-  placement; state holds the live one.
-- **Occupied cells** are derived on demand: take `piece.cells`, apply
-  `rotation`/`flipped`, translate by `x,y`. Transformed cell lists are never
-  stored.
+The tray is a set of cells, allowing holes and nonrectangular shapes without
+special cell roles. `type` and `completion` are machine identifiers; common
+instructions and human-readable rule labels live in code. Puzzle-specific
+notes use `meta.description`.
 
-### Decisions
+Preserve `flipped` even for symmetric pieces. Equivalent geometry does not
+justify discarding face identity; a future two-faced-piece rule could use it.
 
-- **`flipped`, not `mirrored`** — consistent with `allowFlip`.
-- **Never normalise `flipped` away for symmetric shapes.** A 2×2 square has
-  identical cells either way, but for a flat piece geometric flipping and
-  physical face-flipping are the same operation, so `flipped` carries face
-  identity for a post-V1 two-faced-piece rule. Canonicalising equivalent
-  orientations is a solver-internal concern only.
-- **No cell roles.** The container is a plain set of cells, so interior holes
-  and non-rectangular trays come free. Roles (`required`/`optional`/`blocked`)
-  were considered and dropped — the win condition is "all pieces placed", so
-  per-cell coverage never enters it, and `blocked` is just a cell absent from
-  the set.
-- **Bounded playing field, origin `(0,0)` at top-left, no negative
-  coordinates.** The field is the tray plus the surrounding area that initially
-  holds the pieces. The tray's position within the field is implicit in the
-  container's cell coordinates — no separate offset.
-- **`field` is auto-derived, hidden from the author, and written to the file
-  anyway.** Computed as `bbox(tray ∪ all pieces at start)` expanded by a border
-  (2 cells, so edge pieces stay grabbable on touch). Written out so the file is
-  self-describing in a diff, and so changing the sizing algorithm later cannot
-  silently reflow existing puzzles.
-- **Stable `id`, author-defined and readable** (`coffin01`, `coffin02`).
-  Permanent, unique, never reused, distinct from `name`. Readable because it
-  shows up in localStorage keys, validation errors and any future deep link.
-  Required as a separate field because progress keys on it — keying on filename
-  or manifest index would mean renaming or reordering silently corrupts
-  progress.
+### Authored field and runtime workspace
 
-  Two consequences of author-defined ids: uniqueness across the bundled set is
-  checked by the validation sweep rather than guaranteed by construction, and a
-  readable id invites renaming, which silently resets that puzzle's progress. So
-  it is write-once by convention — the editor sets it at creation, does not make
-  it casually editable, and warns if it changes.
+Authored tray cells and starting placements use nonnegative coordinates and
+must fit the stored `field`. `deriveField()` computes width and height from the
+furthest occupied starting cell plus a two-cell trailing border; authors must
+also leave useful leading space. The stored field preserves initial framing
+and is not a visible outer container.
 
-  **Play order is the id, sorted alphabetically.** Zero-pad it (`coffin01`, not
-  `coffin1`, or the set orders 1, 10, 2, 3). Accepted consequence: because id is
-  both identity and ordering, reordering a series means renaming ids, which
-  resets those puzzles' solve progress — so settle ids before a set ships.
-- **No `instructions` field.** With one puzzle type and one win condition it
-  would be identical boilerplate on every puzzle. `description` covers
-  puzzle-specific notes. A post-V1 type supplies its own rules text in code.
-- **`type` and `completion` are IDs; human-readable labels live in code.**
-  Consistent across puzzles, one place to edit, translatable later.
-- **`locked` sits beside `start`.** In V1 every puzzle owns its pieces outright,
-  so piece-level vs placement-level is a distinction without a difference.
+Runtime staging extends the field on every side by the larger of four cells or
+the largest piece dimension. This permits negative runtime coordinates. Clamp
+whole oriented pieces to this finite workspace. The visible grid continues to
+the viewport edges; only the tray has a perimeter.
 
-## Rules and completion
+## Rules and feedback
 
-- **V1 win condition is `all-pieces-contained`** — every piece fully inside the
-  tray, with no violations. Stored as a named ID so further conditions can be
-  added.
-- **Slack is legitimate.** `slack = container area − piece area`. Zero slack is
-  exact packing; positive slack is a normal puzzle with empty cells left over.
-  Only negative slack is impossible.
-- **Containment is all-or-nothing per piece.** A piece straddling the tray edge
-  is not partially valid.
-- **`allowRotation`** is always `true` in V1 but honoured by the core.
-  **`allowFlip`** is per-puzzle.
+A puzzle is solved when every piece is fully inside the tray and there are no
+overlaps. Positive slack (tray area minus total piece area) is legitimate;
+completion never requires filling every tray cell. Negative slack is invalid.
 
-### Permissive drops
+Drops are permissive. Overlaps and straddling placements stay where released,
+subject to workspace bounds. There is no automatic return, nearest-valid-cell
+search, or magnetic attraction to the tray.
 
-Drops always succeed: the piece snaps to the grid cell it was released over and
-stays there. There is no revert-to-origin and no blocked drop, so the
-`invalidDrop` config option was dropped from the schema entirely. Strict drops
-can be added later as an option.
+Violations mark:
 
-The core computes a **violation set** over the whole state, and the view marks
-those cells:
+1. Cells occupied by multiple pieces, including outside the tray.
+2. Cells outside the tray belonging to a piece that is partly inside it.
 
-1. Cells covered by two or more pieces.
-2. Cells of a piece that is *partly* in the tray, falling outside it.
+A piece entirely outside the tray is staged and has no containment violation.
+Containment counts for the whole piece. Player progress excludes pieces
+involved in any violation; contained locked pieces count toward progress.
 
-A piece with **zero** cells in the container is staged, and fine. A piece with
-*some* cells in the container must have all of them in it. Overlaps are marked
-everywhere, including in the staging area — uniform rule, no special cases, and
-it matches the physical fact that pieces cannot stack on a table.
+Honor `allowRotation` and `allowFlip`. Locked pieces cannot be selected,
+transformed, or dragged, and cannot expose a piece underneath to selection.
 
-Completion is then `violations.isEmpty && every piece fully contained` — same
-computation, no extra machinery.
+## Interaction and visual requirements
 
-**Marking is pattern-based, not colour-based** (a piece may itself be red), drawn
-as an overlay above the pieces so it reads on any fill, and therefore also
-colourblind-safe. Working name: hatch / stripey shadow.
+- Drag follows the exact fractional grab point without grid stepping or tween
+  lag. Mouse/touch thresholds are four/six CSS pixels. A faint footprint shows
+  the release candidate. Fractional preview state never triggers saves or solves.
+- On release, snap the origin to the nearest integer (`floor(value + 0.5)`,
+  including negative positions), clamp the whole piece, and commit once. Visual
+  settling lasts about 110 ms, is interruptible, and honors reduced motion.
+- Turning/flipping preserves the grabbed point during a drag. At rest it uses
+  the piece's bounding-box center. The most recently touched piece draws on top.
+- One pointer owns a piece gesture. Ignore other fingers during that drag.
+  Outside release commits at the workspace limit; cancellation, blur, resize,
+  or shutdown restores the committed state. Escape cancels or clears selection.
+- Empty-canvas dragging pans; pinch starts only without a piece drag. Desktop
+  wheel zoom is anchored under the pointer. Freeze the camera during piece
+  dragging. Bound pan and zoom and offer reframe without moving pieces.
+- Initial fit caps cells at 46 CSS pixels; interactive zoom caps them at 72.
+  Resize recalculates limits. Saved attempts are reframed to reveal their pieces.
+- Tray, outer grid, pieces, footprints, and hit testing share one transform,
+  including all four `fieldRotation` values. A decorative rim must not change
+  grid pitch or phase. Field rotation is presentation only.
+- Render whole-piece silhouettes with subtle edge highlights and shadows.
+  Keep internal seams faint. Adjacent same-colored pieces need distinct outlines.
+- Invalid cells retain their hue under a borderless translucent dark screen.
+  Do not give invalid cells or the valid portion a separate outline, bevel, or
+  shadow. No stripes, mesh, warning icons, or wrapped-plastic effect.
+- Locked pieces use whole-face matte grain and seated contact shading, at normal
+  brightness. No lock symbol; the treatment is distinct from invalid shading.
+- Use warm, quiet surfaces. No player title or persistent puzzle-name heading.
+  Metadata belongs in browsing/details/help. Icon controls stay below the board
+  in every orientation, with accessible names, tooltips, and 44 px minimum targets.
+- The dock offers rotate, conditional flip, restart, puzzle browsing, help, and
+  conditional reframe. Reserve any needed second row before fitting the board.
+  Keyboard accelerators are R, Shift+R/E, F, Escape, and right-click rotation.
 
-## Interaction
+## Library experience and persistence
 
-- **Selection is an explicit concept**, and it lives in view state — the core has
-  no opinion about what is highlighted.
-- **Actions panel outside the playfield** holds rotate and flip, operating on the
-  selection. The flip button renders only when `allowFlip` is true. Bottom strip
-  in portrait, side strip in landscape. Desktop additionally gets `R` / `F` and
-  right-click-to-rotate as accelerators over the same operations. This works
-  identically on touch and desktop, so mobile is not a separate design.
-- **Rotation pivot:** the cell under the cursor while dragging; the bounding-box
-  centre for an at-rest piece rotated from the panel.
-- **Drag:** snaps to cells as it moves (reads crisper than snapping only on
-  release), preserves the grab offset so the piece does not jump under the
-  cursor, and clamps to the field.
-- **Z-order:** last-touched draws on top. Clicking a cell shared by overlapping
-  pieces selects the topmost.
-- **Locked pieces are fully non-interactive** — no selection, no drag — so the
-  rotate/flip buttons can never target them.
-- **Reset** returns every piece to its `start` placement.
+Browse **Library → Pack → Puzzle**. Collection cards show name, creator,
+thumbnail, and completion count. Puzzle cards distinguish Not started,
+In progress, and Solved. Search includes name, creator, and catalog number;
+status filters and alternate sorting do not change authored order or identity.
+Cards render in batches of 60. Browse position, query, and filters persist while
+navigating in the running app.
 
-## Presentation
+Continue playing resumes an available unfinished saved attempt. Solved history
+is independent of the current arrangement and survives restarting a puzzle.
+A completion sheet appears once per transition to a solved board. Next follows
+the originating pack's order, even under a browsing filter. At the last puzzle,
+return to the pack; celebrate collection completion only when all its current
+puzzles are solved. There are no progression locks.
 
-Keep the `presentation` block nearly empty; ship a theme in code. Per-puzzle
-presentation config is easy to over-build and hard to keep coherent across
-puzzles. Piece colours are the exception and already live on the piece.
+Direct puzzle links remain supported. Pack context is explicit in the URL;
+ambiguous installed versions require a choice. A direct link without collection
+context returns to the library rather than inventing a Next sequence.
 
-- **`fieldRotation` (0–3) earns its place** — it is purely a display property.
-  Rotation happens at render time; authored coordinates stay canonical, so the
-  core, the validator and a future solver all see one unrotated representation.
-  Two caveats: any text rendered inside the field (piece IDs or coordinates in
-  the editor) needs counter-rotation or it reads sideways; and be explicit about
-  whether the stored `field` is pre- or post-rotation where the fit maths
-  consumes it, since a 20×14 field displays as 14×20 when rotated.
-- **Always stroke piece outlines.** Two same-coloured pieces sitting adjacent
-  otherwise merge into one blob, which is a real legibility failure in this
-  genre, and outlines also keep the hatch overlay readable.
-- **Curated palette (~12 colours) in the editor, not a freeform picker.** A free
-  picker produces nine muddy browns.
-- **Cap cell size in pixels.** Because the field is auto-derived, a small puzzle
-  (3×3 tray, two pieces) would otherwise balloon to absurd cell sizes when
-  scaled to fill a phone. Cap it and centre the field in whitespace instead.
-- **Two scaling layers, do not conflate them.** Phaser's ScaleManager handles
-  canvas↔window. Field↔canvas is per-puzzle — the aspect changes with every
-  puzzle while the canvas is fixed at boot — so that fit belongs to a
-  camera/view transform inside the scene.
+Use text labels for import/export, management, and backup operations. Import
+previews and validates the whole file before mutation. Errors block import;
+warnings do not. No silent repair or partial installation. Identical reimports
+are no-ops. Updates preview changes and retain compatible progress; gameplay
+changes get separate attempts. Shared puzzles retain independent pack versions.
 
-## Editor
+Imported packs are stored locally. Removing a collection retains its history;
+reimporting the same gameplay restores progress. Erasing all progress is a
+separate confirmed action. Backups include content and personal data; content
+exports do not. Restore keeps local conflicts unless replacement is selected.
+See [the format reference](docs/LIBRARY_FORMAT.md) for precise version rules.
 
-An authoring tool, not a public creation platform. Reachable from the main menu.
+## Generated puzzles
 
-- **Validation is advisory and never blocks export.** Authoring is a walk through
-  invalid states — you paint a tray, and until the pieces exist the puzzle is
-  "wrong". The editor always reports the facts and a verdict, and always lets you
-  export.
-  - **Hard errors:** negative slack; a piece with zero cells; two contained
-    pieces overlapping in the starting layout; a `locked` piece not fully inside
-    the tray.
-  - **Warnings:** disconnected piece cells; overlapping staged pieces; missing
-    metadata; slack larger than probably intended; a piece touching the tray
-    (it reads as already placed).
-- **The lock toggle refuses** for a piece that is not fully contained.
-- **The 1-cell tray↔piece gap is a warning, not a nudge.** A tool that moves your
-  work while you are placing it is worse than one that flags it.
-- **Rotate field 90°** toggles the `fieldRotation` presentation flag. Because it
-  is render-time only, there is no coordinate transform to get wrong and it is
-  freely reversible.
-- **Mutations funnel through a small set of named operations**
-  (`paintContainerCell`, `erase`, `addPiece`, `duplicatePiece`, `setPieceColor`,
-  `movePiece`, …). Undo is then a stack of inverses added later; ad-hoc mutations
-  scattered through Phaser callbacks would mean restructuring the editor.
-- Eraser tool. Duplicate-piece (repeated shapes are routine).
-- **Export is a single puzzle file.** No packs in V1. Import exists, giving the
-  round-trip needed to revise a bundled puzzle.
+**Generate puzzle** on the library page opens a sheet with width and height
+steppers (3–9 each, default 6×6) and builds a fresh rectangular puzzle on the
+device. Every generated puzzle has **exactly one solution up to rotating or
+reflecting the whole board**, fills the tray with no spare cells, and allows
+both rotation and flipping. It is saved to the Generated puzzles collection like a
+standalone import, then opened for play. It is named by its local creation
+time and board size (`2026-09-14 12:34:56 · 9×9`); its ID is derived from the
+board size and the random seed, so the same seed always yields the same pieces.
+The Generated puzzles collection also holds individually imported puzzles.
 
-## App shell and persistence
+The generator lives in `src/core/` (`random.js`, `shapes.js`, `solver.js`,
+`partition.js`, `generate.js`) and runs inside a module Web Worker so the
+library stays responsive; a Cancel button ends it. Uniqueness is established by
+search, never assumed: the tray is carved into random connected pieces (that
+carving is the solution), an exact-cover solver looks for a second tiling, and
+if one exists two neighbouring pieces are merged and the check repeats. Merging
+only removes solutions, but no piece may grow past a quarter of the tray
+(clamped to 5–14 cells), because one huge piece makes the solve trivial; when no
+merge fits under that cap the carving is discarded and the tray carved again.
+Pieces above 10 cells are then split again where that keeps the solution unique. The solver treats mirrored and
+rotated arrangements of the whole board as the same solution whether or not
+pieces may flip. Limits live in `GENERATOR_LIMITS`: the piece-size cap, a
+carving allowance, a node budget per check and a wall-clock deadline; when the deadline passes the sheet reports failure and
+offers a retry or a smaller board rather than blocking.
 
-No backend, no server, no editor drafts. Editor state is in memory; export
-downloads a JSON file; the author commits it into the repo.
+Pieces are stored in a random orientation and staged below the tray, so the
+saved definition does not reveal the answer, and no solution is written into
+the file. Solution colours are chosen so that neighbouring pieces in the
+solution differ.
 
-**There are no files at runtime.** The browser has no filesystem: puzzles are
-plain objects in memory. Export writes a download for archiving or committing;
-import reads a user-picked file and parses it into memory without copying it
-anywhere. "File" is an authoring and build-time concept only — the bundled set
-lives in the repo as source and Vite inlines it into the bundle, so nothing is
-fetched or loaded while the game runs.
+Production builds cache the complete application before reporting offline
+readiness. Development is uncached. Browser storage is local to an origin, not
+synced across devices, and is not a backup guarantee. Imports/restores must
+never report success after a failed write. Explicit temporary bundled play is
+available when the database cannot be opened.
 
-**Bundled puzzles are collected from `src/puzzles/` and sorted by `id`**, which
-is what "next puzzle" walks. Nothing needs a hand-maintained order list, and
-filenames carry no meaning for the app — export just suggests `<id>.json` so the
-author never types one.
+## Validation and evolution
 
-A "series" as a first-class concept — shared metadata, its own ordering — is
-puzzle packs, which is post-V1. For V1 a series is an id prefix.
+Structural checks guard geometry traversal. Player imports also reject
+unsupported required features and unknown rule/piece features. The bundled test
+sweep checks validity and ID uniqueness. `npm run check` runs tests before build;
+`npm run build` alone does not run them.
 
-Accepted tradeoff: a refresh mid-authoring loses the work.
+Validation does not establish solvability. The introductory puzzles have tested
+solutions, and generated puzzles are the exception: the solver proves each one
+uniquely solvable at creation time. Imported content is never solver-checked,
+and there is no `knownSolution` schema field. Broken content must be refused
+rather than silently changing its rules.
 
-**Scenes:** home → puzzle menu → player, plus editor.
-
-**Menu cards** show name, author, type, win condition, and solved status. No
-difficulty.
-
-**Solved status in localStorage.** Known drawbacks:
-
-1. Forces the stable `id` above.
-2. Per-browser, per-device, no sync — clearing site data loses everything.
-3. Origin-scoped, not path-scoped, so prefix the keys in case the game ever
-   shares an origin with another app.
-4. Writes can throw (historically Safari private mode) — wrap access and degrade
-   to in-memory rather than crashing.
-
-Also needs a reset-progress control, or there is no way out of an unwanted state.
-
-**On completion:** a popup with home / next / puzzle-selector actions. Detailed
-UX deferred.
-
-**A broken puzzle file is refused at load** and shown as broken in the menu,
-rather than silently repaired — silently unlocking an out-of-tray locked piece
-changes what the puzzle *is*, and an unsolvable puzzle that looks fine is worse
-than one visibly marked broken. But the real fix is build-time: **run the
-validator over every bundled puzzle as a test**, reusing the same core function
-the editor calls, so a broken puzzle cannot ship. Runtime refusal is the backstop
-for imported files.
-
-**Schema policy:** `schemaVersion` on every file; the player warns or refuses on
-an unknown version; migrations are pure JSON→JSON functions.
-
-## Tests worth having alongside the core
-
-The pure core makes these cheap and high-value:
-
-- rotate ×4 = identity; flip ×2 = identity
-- transforms round-trip through serialisation
-- containment at tray edges (all-or-nothing)
-- overlap and violation detection, including partly-in-tray pieces
-- completion under positive slack
-- the bundled-puzzle validation sweep, including id uniqueness across the set
-
-## Post-V1 — do not block
-
-- **`faceConsistency: "uniform"`** for two-faced pieces. *Not* redundant with
-  `allowFlip: false`: that is a movement restriction which freezes each piece on
-  whatever face it started on, making the all-other-face solution unreachable.
-  `faceConsistency` is a win condition over a state where flipping is allowed —
-  a materially different puzzle. The `flipped` placement field already carries
-  the information such a rule would read.
-- **Variable containers** for calendar puzzles: a base cell set plus a way to
-  subtract cells for a given variant (today's date). The win condition stays
-  "all pieces placed", because piece area then equals container area minus the
-  subtracted cells. This is the reason cell roles were not needed.
-- Further win conditions; puzzle packs with shared metadata and defaults; solver
-  and solution counting consuming this same definition; per-piece `allowFlip`
-  (a strict superset of per-puzzle); strict drops as an option;
-  player-driven field rotation; `type` promoted from display label to real
-  dispatch discriminator.
-
-## Open questions
-
-1. **How does the editor edit a piece's shape?** The biggest remaining unknown,
-   and it shapes the whole editor.
-   - *Dedicated scratch grid per piece* — paint cells on a small grid of its own,
-     then arrange placements on the field separately. Clean separation, matches
-     how validation splits into shape vs layout problems, but context-switches.
-   - *Paint directly on the field* — more direct, fewer modes, but editing an
-     existing shape in place among its neighbours gets fiddly, and the field is
-     auto-derived from the very thing being edited.
-
-   Leaning toward the scratch grid, with field arrangement as a distinct mode.
-2. **Phone-friendly authoring.** Since the field is derived from content there is
-   no default field size to make phone-friendly. A portrait aspect guide overlay
-   in the editor was proposed and not liked. Unresolved.
-3. **Editor undo.** Deferred, not rejected. Kept cheap by the named-operations
-   decision above.
-4. **Whether the editor should be gated** behind a URL param rather than shipping
-   on the public main menu. Low stakes.
-5. **Solve-popup UX** in detail.
-
-### Settled during implementation
-
-- **`cells` are coordinate pairs**, not ASCII rows. Parsing is one function
-  either way, so ASCII stays available later as a loader convenience if hand
-  editing ever matters.
-- **The Phaser layer cannot be tested here.** Phaser 4 will not boot under jsdom
-  in either the HEADLESS or CANVAS renderer, so `PlayScene` is only verifiable in
-  a browser. The response was to move the fiddly parts out of it: hit-testing and
-  the mid-drag grab-offset maths live in `src/ui/interaction.js`, and the
-  field-to-canvas transform in `src/ui/layout.js`, both pure and both tested.
-  What remains in the scene is drawing calls and event wiring.
-
-### Considered and set aside
-
-- **`knownSolution`** (author solves the puzzle in the editor, placements are
-  captured) — rejected for V1. Accepted consequence: with no solver and no
-  captured solution, nothing verifies that an authored puzzle is solvable.
-- **Player-side undo** — probably unnecessary; moves are non-destructive and
-  reset covers the real need.
-- **Move counter** — nearly free, not wanted now.
-- **Keyboard-only play** — out of scope; the explicit selection model leaves the
-  door open.
+Keep puzzle schema, pack format, library storage, gameplay identity, and future
+draft versions distinct. Future migrations should be explicit pure data
+transformations. Add new mechanics only through a supported schema/rule design;
+do not embed executable rules in imported files.

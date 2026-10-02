@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "id": "little-turn",
+  "type": "square-grid-packing",
+  "meta": {
+    "name": "A little turn",
+    "author": "Pakke",
+    "description": "Select the piece and turn it to match the tray. Pieces can wait anywhere outside while you think.",
+    "tags": [
+      "introduction"
+    ],
+    "source": "Original introductory puzzle."
+  },
+  "container": {
+    "cells": [
+      [
+        2,
+        2
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        3,
+        3
+      ]
+    ]
+  },
+  "rules": {
+    "allowRotation": true,
+    "allowFlip": false,
+    "completion": "all-pieces-contained"
+  },
+  "pieces": [
+    {
+      "id": "a",
+      "cells": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "color": "#89aa7c",
+      "start": {
+        "x": 2,
+        "y": 5,
+        "rotation": 1,
+        "flipped": false
+      },
+      "locked": false
+    }
+  ],
+  "presentation": {
+    "fieldRotation": 0
+  },
+  "field": {
+    "width": 6,
+    "height": 9
+  }
+}

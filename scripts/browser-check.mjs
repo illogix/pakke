@@ -98,7 +98,7 @@ try {
     await page.screenshot({path:out+'completed.png'});await page.getByRole('button',{name:'Close',exact:true}).click();
     await page.setViewportSize({width:392,height:844});await page.waitForTimeout(300);assert.equal(await page.locator('#sheet').evaluate(d=>d.open),false);checks++;
     await page.getByRole('button',{name:'Restart puzzle',exact:true}).click();await page.getByRole('button',{name:'Confirm restart',exact:true}).click();
-    assert.equal(await scene(s=>s.solved),false);assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('packing:v2:puzzle:demo01')).solved),true);checks++;
+    assert.equal(await scene(s=>s.solved),false);await scene(async s=>{await s.shell.repo.flush();});assert.equal(await scene(s=>s.shell.repo.state.progress[s.shell.record.gameKey].solved),true);checks++;
     for(const id of ['demo01','pent01'])for(const [width,height] of [[320,568],[390,844],[844,390],[1280,800]]) {
         await page.setViewportSize({width,height});await load(id);await reset();
         if(id==='demo01')await drag([2.3,7.4],[4.3,5.4]);
@@ -112,7 +112,7 @@ try {
         }
         await page.screenshot({path:out+`${id}-${width}x${height}.png`});checks++;
     }
-    await page.goto(base);await page.getByRole('heading',{name:'A little room to think.'}).waitFor();await page.getByRole('button',{name:'Resume puzzle',exact:true}).click();await page.locator('.progress').waitFor();checks++;
-    await page.goto(`${base}/?puzzle=unknown`);await page.getByRole('heading',{name:'Puzzle unavailable'}).waitFor();await page.getByRole('button',{name:'Choose a puzzle',exact:true}).last().click();await page.getByRole('heading',{name:'Choose a puzzle',exact:true}).waitFor();checks++;
+    await page.goto(base);await page.getByRole('heading',{name:'Your library',exact:true}).waitFor();await page.locator('.continue-card').click();await page.locator('.progress').waitFor();checks++;
+    await page.goto(`${base}/?puzzle=unknown`);await page.getByRole('heading',{name:'Puzzle unavailable'}).waitFor();await page.getByRole('button',{name:'Close',exact:true}).click();await page.getByRole('heading',{name:'Your library',exact:true}).waitFor();checks++;
     assert.deepEqual(errors,[]);console.log(`PASS: ${checks} browser checks; screenshots in docs/verification. No page errors.`);
 } finally {await browser.close();}

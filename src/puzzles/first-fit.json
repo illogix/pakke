@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "id": "first-fit",
+  "type": "square-grid-packing",
+  "meta": {
+    "name": "A first fit",
+    "author": "Pakke",
+    "description": "Drag the two pieces into the tray. Pieces waiting outside can stay on the grid until you need them.",
+    "tags": [
+      "introduction"
+    ],
+    "source": "Original introductory puzzle."
+  },
+  "container": {
+    "cells": [
+      [
+        2,
+        2
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        3,
+        3
+      ]
+    ]
+  },
+  "rules": {
+    "allowRotation": true,
+    "allowFlip": false,
+    "completion": "all-pieces-contained"
+  },
+  "pieces": [
+    {
+      "id": "a",
+      "cells": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ],
+      "color": "#629daf",
+      "start": {
+        "x": 2,
+        "y": 5,
+        "rotation": 0,
+        "flipped": false
+      },
+      "locked": false
+    },
+    {
+      "id": "b",
+      "cells": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ],
+      "color": "#dbad51",
+      "start": {
+        "x": 5,
+        "y": 5,
+        "rotation": 0,
+        "flipped": false
+      },
+      "locked": false
+    }
+  ],
+  "presentation": {
+    "fieldRotation": 0
+  },
+  "field": {
+    "width": 9,
+    "height": 8
+  }
+}

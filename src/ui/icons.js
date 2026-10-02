@@ -10,7 +10,9 @@ const paths = {
     next:'<path d="m9 5 7 7-7 7"/>',
     home:'<path d="m3 11 9-8 9 8M5 10v10h5v-6h4v6h5V10"/>',
     play:'<path d="m8 4 12 8-12 8Z"/>',
-    settings:'<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="currentColor"/><circle cx="15" cy="17" r="3" fill="currentColor"/>'
+    settings:'<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="currentColor"/><circle cx="15" cy="17" r="3" fill="currentColor"/>',
+    plus:'<path d="M12 5v14M5 12h14"/>',
+    minus:'<path d="M5 12h14"/>'
 };
 export function icon(name) { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]??paths.help}</svg>`; }
 export function iconButton(name,label,run) {

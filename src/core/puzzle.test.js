@@ -202,6 +202,41 @@ describe('state operations', () => {
         expect(state.placements.a.rotation).toBe(0);
     });
 
+    it('lands an oblong piece back in its own box every half turn', () => {
+        const ell = {
+            id: 'ell',
+            cells: [[0, 0], [0, 1], [0, 2], [1, 2]],
+            color: '#fff',
+            locked: false,
+            start: { x: 5, y: 4, rotation: 0, flipped: false }
+        };
+
+        for (const direction of [1, -1]) {
+            for (const piece of [ell, { ...bar, start: ell.start }]) {
+                const def = makeDef({ pieces: [piece] });
+                let state = createState(def);
+
+                for (let turn = 1; turn <= 4; turn++) {
+                    state = rotatePiece(def, state, piece.id, direction);
+
+                    // Odd quarter-turns sit half a cell off — an oblong box has no
+                    // exact centre to turn about — but half turns must land home.
+                    if (turn % 2 === 0) {
+                        expect(state.placements[piece.id]).toMatchObject({ x: 5, y: 4 });
+                    }
+                }
+            }
+        }
+    });
+
+    it('undoes a turn when it is turned back the other way', () => {
+        const def = makeDef({ pieces: [{ ...bar, start: { x: 5, y: 4, rotation: 0, flipped: false } }] });
+        const state = createState(def);
+        const there = rotatePiece(def, state, 'bar', 1);
+
+        expect(rotatePiece(def, there, 'bar', -1).placements.bar).toEqual(state.placements.bar);
+    });
+
     it('clamps a runtime placement to the expanded workspace', () => {
         const def = makeDef();
         const state = setPlacement(def, createState(def), 'a', {
