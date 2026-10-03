@@ -1,0 +1,4 @@
+// Signing for Debug and Release. Your Apple Developer Team ID goes in
+// Local.xcconfig next to this file, which git ignores; copy
+// Local.xcconfig.example to start. Without it, choose a team in Xcode.
+#include? "Local.xcconfig"

@@ -17,7 +17,8 @@
     }
 }
 * {box-sizing:border-box}
-body {margin:0;background:var(--bg)}
+body {margin:0;background:var(--bg);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input {-webkit-user-select:text;user-select:text}
 button,input,select {font:inherit;color:inherit}
 button {cursor:pointer;-webkit-tap-highlight-color:transparent}
 button:disabled {cursor:default;opacity:.3}
@@ -44,6 +45,22 @@ button:disabled {cursor:default;opacity:.3}
     #controls {padding-top:4px;padding-bottom:max(8px,env(safe-area-inset-bottom))}
     .dock .icon-button {height:44px}
 }
+
+/* A turned touch device keeps the dock on its own bottom edge, away from the
+   notch: beside the board in landscape, above it upside down. The buttons
+   always run top to bottom or left to right. */
+#app[data-dock] {padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+#app[data-dock=left],#app[data-dock=right] {grid-template-rows:minmax(0,1fr)}
+#app[data-dock=left] {grid-template-columns:auto minmax(0,1fr);padding-left:0}
+#app[data-dock=right] {grid-template-columns:minmax(0,1fr) auto;padding-right:0}
+#app[data-dock=top] {grid-template-rows:auto minmax(0,1fr);padding-top:0}
+#app[data-dock=left] #controls,#app[data-dock=top] #controls {order:-1}
+#app[data-dock=left] #game {grid-column:2} #app[data-dock=top] #game {grid-row:2}
+#app[data-dock=left] #controls,#app[data-dock=right] #controls {flex-direction:column;justify-content:center;padding:8px}
+#app[data-dock=top] #controls {padding:max(8px,env(safe-area-inset-top)) 12px 8px}
+#app[data-dock=left] .dock,#app[data-dock=right] .dock {flex-direction:column;max-height:100%}
+#app[data-dock=left] .dock .icon-button,#app[data-dock=right] .dock .icon-button {width:52px;height:auto;flex:0 1 60px;min-width:0;min-height:40px}
+#app[data-dock=left] .dock-divider,#app[data-dock=right] .dock-divider {margin:4px 12px}
 
 /* Pages */
 #screen {position:absolute;inset:0;z-index:3;overflow:auto;overscroll-behavior:contain;background:var(--bg);

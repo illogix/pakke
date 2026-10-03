@@ -193,6 +193,21 @@ try {
         await page.screenshot({path:out+`${id}-${width}x${height}.png`});
         await page.emulateMedia({colorScheme:'dark'});await pause();await page.screenshot({path:out+`${id}-${width}x${height}-dark.png`});await page.emulateMedia({colorScheme:'light'});checks++;
     }
+    // A turned phone keeps the dock on its bottom edge: beside the board in landscape, above it upside down,
+    // with buttons in reading order. Input still maps through the moved canvas.
+    for(const [angle,side,width,height] of [[270,'left',844,390],[90,'right',844,390],[180,'top',390,844]]) {
+        await page.setViewportSize({width,height});await load();await reset();
+        await scene((s,a)=>s.shell.placeDock(a,true),angle);await page.waitForTimeout(300);
+        const r=await page.evaluate(()=>({canvas:document.querySelector('#game canvas').getBoundingClientRect().toJSON(),footer:document.querySelector('#controls').getBoundingClientRect().toJSON(),
+            buttons:[...document.querySelectorAll('.dock button')].map(b=>({label:b.getAttribute('aria-label'),...b.getBoundingClientRect().toJSON()}))}));
+        const along=side==='top'?'left':'top';
+        assert.deepEqual(r.buttons.map(b=>b.label),[...r.buttons].sort((a,b)=>a[along]-b[along]).map(b=>b.label),`${side} dock reads in order`);
+        for(const b of r.buttons) {assert(b.width>=44&&b.height>=40);assert(b.left>=0&&b.right<=width&&b.top>=0&&b.bottom<=height);}
+        if(side==='left')assert(r.footer.right<=r.canvas.left+.01);else if(side==='right')assert(r.canvas.right<=r.footer.left+.01);else assert(r.footer.bottom<=r.canvas.top+.01);
+        if(side!=='top')assert(r.canvas.height>height-1,'a side dock gives the board the full height');
+        await drag(bar(.3,.4),bar(1.3,-.6));assert.deepEqual(await scene(s=>[s.state.placements.bar.x,s.state.placements.bar.y]),bar(1,-1));
+        await page.screenshot({path:out+`dock-${side}.png`});await scene(s=>s.shell.placeDock(0,true));checks++;
+    }
     await page.goto(base);await page.getByRole('heading',{name:'Pakke',exact:true}).waitFor();await page.locator('[data-continue]').click();await controls();checks++;
     await page.goto(`${base}/?puzzle=unknown`);await page.getByRole('heading',{name:'Puzzle unavailable'}).waitFor();await page.getByRole('button',{name:'Close',exact:true}).click();await page.getByRole('heading',{name:'Pakke',exact:true}).waitFor();checks++;
     assert.deepEqual(errors,[]);console.log(`PASS: ${checks} browser checks; screenshots in docs/verification. No page errors.`);

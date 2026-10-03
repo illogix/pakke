@@ -71,13 +71,14 @@ themes, and the follow-up that moved every control into one bottom dock with a
 More menu, arranged pieces around the tray for the screen's shape, and made Fit
 a tight frame, with `playwright-core` driving the desktop Chrome. The player
 script was rerun the same day after adding tap-to-turn and the long-press flip
-charge and making Flip a left-to-right mirror on screen.
+charge and making Flip a left-to-right mirror on screen, and again on October 3
+after moving the dock to the device's bottom edge on turned touch screens.
 
 | Check | Last result | Coverage |
 | --- | --- | --- |
-| Unit suite | 429 tests in 16 files passed | Core rules/geometry, camera/gesture math, workspace, validation, hashing, library revisions, migration, backup/restore, failed writes, introductory solutions, generator, starting layout, screen-shaped arrangement (spacing, workspace, best shape), tray-centred opening and tight Fit, colour-scheme tokens and piece palette, screen-horizontal flips at every orientation, and the tap/long-press decision and charged-press slop. |
+| Unit suite | 432 tests in 16 files passed | Core rules/geometry, camera/gesture math, workspace, validation, hashing, library revisions, migration, backup/restore, failed writes, introductory solutions, generator, starting layout, screen-shaped arrangement (spacing, workspace, best shape), tray-centred opening and tight Fit, colour-scheme tokens and piece palette, screen-horizontal flips at every orientation, and the tap/long-press decision and charged-press slop, and the dock side for each screen angle. |
 | Production build | Passed | Full application and offline service worker emitted. Vite warns about the Phaser-containing JS chunk. |
-| Player browser script | 38 checks passed | Drag/release, turn/flip, tap to select then turn, long-press flip mirroring left to right at turned pieces and rotated fields, Flip enabled while charged, kept through drift under a cell and dropped after a cell, a drag returned to its start staying a move, ownership/cancellation, touch/pinch, transforms, saved attempts, completion, tray centring on opening, tight Fit, re-arrangement on resize until the first move, the dock and More menu, and backdrop-tap cancel, with player screenshots in both schemes. |
+| Player browser script | 41 checks passed | Drag/release, turn/flip, tap to select then turn, long-press flip mirroring left to right at turned pieces and rotated fields, Flip enabled while charged, kept through drift under a cell and dropped after a cell, a drag returned to its start staying a move, ownership/cancellation, touch/pinch, transforms, saved attempts, completion, tray centring on opening, tight Fit, re-arrangement on resize until the first move, the dock and More menu, the dock beside the board for each landscape turn and above it upside down, with buttons in reading order and dragging through the moved canvas, and backdrop-tap cancel, with player screenshots in both schemes. |
 | Library browser script | 34 checks passed (dev); 36 with `PRODUCTION=1` | Home steppers, Collections tree and filter sheet, layout in both schemes at four sizes, navigation and history, file import/export through group actions, duplicates and conflicts, backup into a fresh profile, removal/reimport with progress, and offline imported/bundled play. |
 | Reliability browser script | 8 checks passed | 1,000-puzzle paging within a group, simulated write failure, actual stale-tab rejection, reopening, denied storage, migration, and absent SubtleCrypto. |
 
@@ -122,6 +123,16 @@ Scripts regenerate screenshots in `docs/verification/`. That directory is
 ignored disposable test output, not game assets or a design source. Superseded
 concept images and old captures have been removed. Reproduce current screenshots
 from the running build rather than treating generated concepts as authoritative.
+
+The iOS app has been installed on an iPhone from Xcode but not yet checked
+systematically; the simulator was skipped as too slow. Check launch with no white flash in either scheme, no
+page zoom, text selection, callout or loupe from pinches, long presses and
+double-tap-and-hold, a long
+press on a piece enabling Flip and flipping on release, the dock moving to the
+left when the phone is turned clockwise and to the right when turned
+counterclockwise, including a direct half turn between the two, generation in its
+worker, import through the file picker, export and backup through the share
+sheet, and that the library survives quitting the app and airplane mode.
 
 Physical iOS/Android testing, Safari behavior, native sharing, sustained phone
 performance, and the broader offline/storage lifecycle remain unverified.

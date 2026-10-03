@@ -43,6 +43,7 @@ the source of truth for piece placements or rules.
 | `src/ui/` | Camera and gesture math, colour-scheme tokens, procedural materials, silhouettes, and icons. Some rendering helpers use browser canvas/DOM APIs. |
 | `src/scenes/` | Phaser drawing, event wiring, transient selection and gesture previews. |
 | `src/app/` | Home and Collections pages, player controls/dialogs, routing, offline registration, legacy storage migration, and the generator controls with their Web Worker. |
+| `ios/` | Capacitor's Xcode project, which bundles the production build into a native iPhone app. Its copy of `dist/` is regenerated, not committed. |
 
 Keep these concepts separate:
 
@@ -216,13 +217,20 @@ transformed, or dragged, and cannot expose a piece underneath to selection.
   brightness. No lock symbol; the treatment is distinct from invalid shading.
 - No player title or persistent puzzle-name heading. Metadata belongs in the
   Collections tree and Help. Icon controls have accessible names, tooltips, and
-  44 px minimum targets, and keep the same place in every orientation.
+  44 px minimum targets.
 - Nothing sits above the board, which keeps clear of the notch or Dynamic
   Island. Below it, one rounded dock holds Rotate left, Rotate right, Flip when
   the puzzle allows it, a divider, Fit all pieces in view, and More. Buttons are
   60 × 52 px and shrink evenly (to no less than 40 px) so the dock stays on one
   row; at 320 px five buttons are 54 px. There is no visible progress line;
   progress is announced to screen readers.
+- On a touch device the dock stays on the device's own bottom edge, away from
+  the notch, as the screen turns: on the left when the device is turned
+  clockwise, on the right when it is turned counterclockwise, and above the
+  board upside down (where the device allows it; Face ID iPhones do not). A
+  side dock is a column 52 px wide reading top to bottom in the same order, and
+  the board takes the full height. Mouse and trackpad devices keep the dock at
+  the bottom.
 - More opens a sheet titled with the puzzle's name, listing Restart, Help and
   Home as full-width rows with icon and label. Restart swaps the sheet for its
   confirmation. Any sheet closes, cancelling, on Escape, its close button, or a
@@ -263,6 +271,13 @@ One rounded typeface, varied only by size and weight:
 Safari on Apple platforms; elsewhere the plain system font is used, and no web
 font is shipped. Icons are inlined Framework7 Icons (MIT, filled, 56-unit
 viewBox) in `src/ui/icons.js`, plus a custom half-filled circle for Started.
+
+The app icon is a Blue P piece and the Yellow domino completing its 3×3 square,
+with rounded corners and no gap at their seam, so every cell stays square, on
+Base. The favicon is one SVG whose colours follow `prefers-color-scheme`,
+falling back to Latte; the iOS icon set has Latte, Mocha, and a grayscale tinted
+variant (white P, grey domino, black ground). `scripts/icons.mjs` generates all
+of them.
 
 UI text is labels, names, counts, and statuses only: no taglines, explainer
 sentences under headings, or section blurbs. Empty states use the shortest
@@ -351,11 +366,14 @@ neighbouring pieces in the solution are never a multiple of six apart and so
 never share a palette colour.
 
 Production builds register a service worker that caches the complete
-application; the app never needs the network after that, so no offline status
-is shown. Development is uncached. Browser storage is local to an origin, not
-synced across devices, and is not a backup guarantee. Imports/restores must
-never report success after a failed write. Explicit temporary bundled play is
-available when the database cannot be opened.
+application; the app never needs the network after that, so no offline status is
+shown. Development is uncached. The iOS app carries every file in its bundle, so
+it skips the service worker; its launch screen and web view background use the
+page colour for the current scheme. Its storage is separate from Safari's.
+Browser storage is local to an origin, not synced across devices, and is not a
+backup guarantee. Imports/restores must never report success after a failed
+write. Explicit temporary bundled play is available when the database cannot be
+opened.
 
 ## Validation and evolution
 

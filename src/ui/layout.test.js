@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createLayout } from './layout.js';
+import { createLayout, dockSide } from './layout.js';
 
 const field = { width: 8, height: 5 };
 const viewport = { width: 800, height: 600 };
@@ -95,5 +95,22 @@ describe('screenToCell', () => {
 
         expect(layout.screenToCell(layout.originX - 5, layout.originY - 5)).toBeNull();
         expect(layout.screenToCell(1e6, 1e6)).toBeNull();
+    });
+});
+
+describe('dockSide', () => {
+    it('keeps the dock on the device bottom edge as the screen turns', () => {
+        expect(dockSide(0)).toBe('bottom');
+        expect(dockSide(90)).toBe('right');
+        expect(dockSide(180)).toBe('top');
+        expect(dockSide(270)).toBe('left');
+    });
+    it('reads iOS window.orientation, which turns clockwise as negative', () => {
+        expect(dockSide(-90)).toBe('left');
+        expect(dockSide(90)).toBe('right');
+    });
+    it('keeps the bottom on mouse and trackpad devices', () => {
+        expect(dockSide(90, false)).toBe('bottom');
+        expect(dockSide(270, false)).toBe('bottom');
     });
 });

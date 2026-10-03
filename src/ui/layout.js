@@ -113,7 +113,14 @@ export function createLayout({
     };
 }
 
-/** Controls stay below the viewport in every orientation. */
-export function panelFor(viewport, theme) {
-    return { side: 'bottom', thickness: theme.panelThickness };
+/**
+ * The screen edge for the controls on a touch device: the device's own bottom
+ * edge, away from any notch, however the screen is turned. `angle` is the
+ * screen's clockwise rotation from its natural orientation in degrees, as in
+ * `screen.orientation.angle` or iOS's `window.orientation`. Mouse and trackpad
+ * devices keep the controls at the bottom whatever their screen reports.
+ */
+export function dockSide(angle, touch = true) {
+    if (!touch) return 'bottom';
+    return { 90: 'right', 180: 'top', 270: 'left' }[(((Math.round(angle / 90) * 90) % 360) + 360) % 360] ?? 'bottom';
 }

@@ -16,6 +16,7 @@ untracked, so it is present locally but never committed.
 - `npm run preview` — serve the built output
 - `npm test` — Vitest over pure logic, interaction, persistence, and bundled content
 - `npm run check` — tests followed by production build
+- `npm run ios` — production build copied into the Capacitor iOS project (`npx cap open ios` opens Xcode)
 
 ## Layout
 
@@ -29,6 +30,7 @@ untracked, so it is present locally but never committed.
   Math is pure; material/icon helpers also use browser canvas/DOM APIs.
 - `src/scenes/` — Phaser scenes, default-exported classes extending `Phaser.Scene`
 - `src/main.js` — `Phaser.Game` config and scene registration
+- `ios/` — Capacitor's native iOS project; `ios/App/App/public` is a generated copy of `dist/`
 
 Phaser 4 will not boot under jsdom, so scenes cannot be unit tested — keep logic
 worth testing in `core/` or `ui/` and leave drawing and event wiring in the scene.

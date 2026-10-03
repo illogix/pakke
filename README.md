@@ -30,11 +30,35 @@ updates do not interrupt an active game; close old app tabs to allow a waiting
 version to activate. Normal local HTTP/LAN play is supported, but offline
 installation requires a browser and serving origin that support service workers.
 
+## iPhone app
+
+`ios/` is a Capacitor project that bundles the production build into a native
+app, which then runs fully offline. It needs Xcode and an Apple developer
+account.
+
+```sh
+npm run ios      # Production build, copied into the Xcode project
+npx cap open ios # Open the project in Xcode
+```
+
+Copy `ios/Local.xcconfig.example` to `ios/Local.xcconfig` and set your Apple
+Developer Team ID there; git ignores that file. Choosing a team in Xcode's
+Signing & Capabilities also works, but writes it into the project file. If
+Xcode reports the bundle identifier is unavailable, change `appId` in
+`capacitor.config.json` and the App target's Bundle Identifier to your own.
+Pick your connected iPhone as the run destination and press Run. Rerun
+`npm run ios` after web changes. The app keeps its own library, separate from
+Safari's; use backup/restore to move one across.
+
+`node scripts/icons.mjs` regenerates `public/favicon.svg` and the light, dark
+and tinted app icons. It needs Playwright, set up as for the browser checks in
+[docs/VERIFICATION.md](docs/VERIFICATION.md).
+
 ## Play and manage puzzles
 
 Drag a piece continuously and release to snap. Tap a piece to select it, tap it
 again to turn it clockwise, or hold it still until Flip lights up and release to
-flip it. The bottom controls turn and flip the selected piece. Drag empty canvas
+flip it. The dock's controls turn and flip the selected piece. Drag empty canvas
 to pan; pinch or scroll to zoom. Reframe fits all pieces in view. Keyboard
 shortcuts: **R** clockwise, **Shift+R** or **E** counterclockwise, **F** flip
 when allowed, and **Escape** cancel or clear selection. Right-click a movable

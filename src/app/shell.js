@@ -7,6 +7,7 @@ import { LibraryUI } from './library-ui.js';
 import { prepareOffline } from './offline.js';
 import { validatePuzzle } from '../core/validate.js';
 import { slack } from '../core/puzzle.js';
+import { dockSide } from '../ui/layout.js';
 
 const text = (tag,value,className='') => { const e=document.createElement(tag);e.textContent=value;e.className=className;return e; };
 export class Shell {
@@ -20,6 +21,15 @@ export class Shell {
         this.dialog.addEventListener('pointerdown',e=>{backdrop=e.target===this.dialog;});
         this.dialog.addEventListener('click',e=>{if(backdrop&&e.target===this.dialog)this.closeSheet();backdrop=false;});
         window.addEventListener('popstate',()=>this.route());
+        // The dock follows the device's bottom edge when it is turned. A half
+        // turn keeps the same size, so resize alone would miss it.
+        const touch=matchMedia('(pointer: coarse)'),place=()=>this.placeDock(screen.orientation?.angle??window.orientation??0,touch.matches);
+        screen.orientation?.addEventListener('change',place);window.addEventListener('orientationchange',place);
+        window.addEventListener('resize',place);touch.addEventListener('change',place);place();
+    }
+    placeDock(angle,touch) {
+        const app=document.querySelector('#app'),side=dockSide(angle,touch);
+        if(side==='bottom')delete app.dataset.dock;else app.dataset.dock=side;
     }
     connect(game) {
         this.game=game;

@@ -9,12 +9,16 @@
         "preview": "vite preview",
         "test": "vitest run",
         "test:watch": "vitest",
-        "check": "npm test && npm run build"
+        "check": "npm test && npm run build",
+        "ios": "vite build && cap sync ios"
     },
     "dependencies": {
+        "@capacitor/core": "^8.5.2",
+        "@capacitor/ios": "^8.5.2",
         "phaser": "^4.2.1"
     },
     "devDependencies": {
+        "@capacitor/cli": "^8.5.2",
         "vite": "^8.1.5",
         "vitest": "^4.1.10"
     }
