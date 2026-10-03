@@ -37,7 +37,8 @@ it('honors orientation rules even through direct placement calls',()=>{
     expect(setPlacement(def,state,'bar',{...state.placements.bar,x:NaN})).toBe(state);
 });
 it('does not report an overlapped contained piece as progress',()=>{
-    const state=movePiece(demo,createState(demo),'bar',2,2);
+    const locked=demo.pieces.find(p=>p.locked).start;
+    const state=movePiece(demo,createState(demo),'bar',locked.x,locked.y);
     expect(progress(demo,state).contained).toBe(2);expect(validProgress(demo,state).contained).toBe(0);
 });
 it.each([null,[],{},'bad', {...demo,pieces:null},{...demo,pieces:[null]}, {...demo,container:{cells:[[0]]}}, {...demo,field:{width:Infinity,height:1}}, {...demo,container:{cells:[[1,1],[1,1]]}}])('malformed definitions return a report without throwing (%#)',def=>{

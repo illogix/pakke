@@ -6,6 +6,7 @@
 // by returning the state unchanged. They never refuse a placement for being
 // invalid — overlapping and out-of-tray placements are permitted and marked.
 
+import { mirrorOrientation } from './geometry.js';
 import { findPiece, orientedBounds } from './puzzle.js';
 import { snapPlacement } from './workspace.js';
 
@@ -71,14 +72,25 @@ export function rotatePiece(def, state, pieceId, direction = 1) {
     return setPlacement(def, state, pieceId, recentre(piece, current, next));
 }
 
-export function flipPiece(def, state, pieceId) {
+/**
+ * Mirror a piece left to right in field coordinates, or top to bottom when
+ * `vertical`. Where rotation is disallowed the turn must stay, so only the flip
+ * toggles and the axis follows the piece's rotation instead.
+ */
+export function flipOrientation(def, placement, vertical = false) {
+    if (def.rules.allowRotation === false) return { rotation: placement.rotation, flipped: !placement.flipped };
+
+    return mirrorOrientation(placement.rotation, placement.flipped, vertical);
+}
+
+export function flipPiece(def, state, pieceId, vertical = false) {
     const piece = findPiece(def, pieceId);
     const current = state.placements[pieceId];
 
     if (!piece || piece.locked || !current) return state;
     if (def.rules.allowFlip !== true) return state;
 
-    const next = { ...current, flipped: !current.flipped };
+    const next = { ...current, ...flipOrientation(def, current, vertical) };
 
     return setPlacement(def, state, pieceId, recentre(piece, current, next));
 }

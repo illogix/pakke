@@ -5,6 +5,7 @@ import {
     cellsEqual,
     flipH,
     isConnected,
+    mirrorOrientation,
     normalise,
     orient,
     outlineEdges,
@@ -99,6 +100,23 @@ describe('orient', () => {
 
     it('reaches only one for a square', () => {
         expect(distinctOrientations([[0, 0], [1, 0], [0, 1], [1, 1]])).toBe(1);
+    });
+});
+
+describe('mirrorOrientation', () => {
+    const flipV = cells => normalise(cells.map(([x, y]) => [x, -y]));
+
+    it('mirrors what is shown left to right, or top to bottom, at every orientation', () => {
+        for (let rotation = 0; rotation < 4; rotation++) {
+            for (const flipped of [false, true]) {
+                const shown = orient(J, rotation, flipped);
+                const across = mirrorOrientation(rotation, flipped);
+                const down = mirrorOrientation(rotation, flipped, true);
+
+                expect(orient(J, across.rotation, across.flipped)).toEqual(flipH(shown));
+                expect(orient(J, down.rotation, down.flipped)).toEqual(flipV(shown));
+            }
+        }
     });
 });
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { flipH, orient } from './geometry.js';
 import {
     clampToField,
     containment,
@@ -7,9 +8,10 @@ import {
     deriveField,
     orientedBounds,
     placedCells,
-    slack
+    slack,
+    stagePieces
 } from './puzzle.js';
-import { createState, flipPiece, movePiece, rotatePiece, setPlacement } from './state.js';
+import { createState, flipOrientation, flipPiece, movePiece, rotatePiece, setPlacement } from './state.js';
 
 function rect(x0, y0, w, h) {
     const cells = [];
@@ -166,6 +168,26 @@ describe('state operations', () => {
         expect(flipPiece(def, state, 'a')).toBe(state);
     });
 
+    it('flips a turned piece left to right, not top to bottom', () => {
+        const ell = { id: 'ell', cells: [[0, 0], [0, 1], [0, 2], [1, 2]], color: '#fff', locked: false, start: { x: 5, y: 4, rotation: 1, flipped: false } };
+        const def = makeDef({ pieces: [ell] });
+        const state = createState(def);
+        const once = flipPiece(def, state, 'ell');
+        const { rotation, flipped } = once.placements.ell;
+
+        expect(orient(ell.cells, rotation, flipped)).toEqual(flipH(orient(ell.cells, 1, false)));
+        expect(flipPiece(def, once, 'ell').placements.ell).toEqual(state.placements.ell);
+    });
+
+    it('keeps the turn when flipping a puzzle that disallows rotation', () => {
+        const def = makeDef({
+            rules: { allowRotation: false, allowFlip: true, completion: 'all-pieces-contained' }
+        });
+
+        expect(flipOrientation(def, { rotation: 1, flipped: false })).toEqual({ rotation: 1, flipped: true });
+        expect(flipPiece(def, createState(def), 'a').placements.a.flipped).toBe(true);
+    });
+
     it('leaves the original state untouched when a piece moves', () => {
         const def = makeDef();
         const before = createState(def);
@@ -247,5 +269,28 @@ describe('state operations', () => {
         });
 
         expect(state.placements.a).toMatchObject({ x: 14, y: 15 });
+    });
+});
+
+describe('stagePieces', () => {
+    it('splits free pieces above and below the tray, centred, and keeps locked pieces in place', () => {
+        const locked = { id: 'l', cells: [[0, 0]], start: { x: 2, y: 2, rotation: 0, flipped: false }, locked: true };
+        const def = makeDef({ pieces: [...makeDef().pieces, { ...bar, start: { x: 0, y: 9, rotation: 1, flipped: false } }, locked] });
+        const { def: staged, offset } = stagePieces(def);
+        const tray = staged.container.cells;
+        const [top, bottom] = [Math.min(...tray.map(c => c[1])), Math.max(...tray.map(c => c[1]))];
+        const of = (id) => placedCells(staged.pieces.find(p => p.id === id), staged.pieces.find(p => p.id === id).start);
+
+        // Areas 2, 2 and 4 of 8: the first two go below, the bar above.
+        expect(Math.min(...of('a').map(c => c[1]))).toBe(bottom + 2);
+        expect(Math.min(...of('b').map(c => c[1]))).toBe(bottom + 2);
+        expect(Math.max(...of('bar').map(c => c[1]))).toBe(top - 2);
+        expect(of('l')).toEqual([[2 + offset[0], 2 + offset[1]]]);
+        expect(staged.pieces.find(p => p.id === 'bar').start.rotation).toBe(1);
+
+        const all = [...tray, ...staged.pieces.flatMap(p => placedCells(p, p.start))];
+        expect(Math.min(...all.map(c => c[0]))).toBe(2);
+        expect(Math.min(...all.map(c => c[1]))).toBe(2);
+        expect(staged.field).toEqual(deriveField(staged));
     });
 });

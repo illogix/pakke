@@ -1,6 +1,7 @@
 // One continuous coordinate transform for rendering, grid lines and input.
 import { workspaceBounds } from '../core/workspace.js';
 import { placedCells } from '../core/puzzle.js';
+import { arrangePieces } from '../core/arrange.js';
 
 export function displayPoint(field, rotation, x, y) {
     switch (rotation) {
@@ -27,9 +28,35 @@ export function displayBox(def, box) {
 const fit = (viewport, box, pad = 20) => Math.max(0.01, Math.min(
     Math.max(1, viewport.width - pad * 2) / (box.maxX - box.minX),
     Math.max(1, viewport.height - pad * 2) / (box.maxY - box.minY)));
-export function createCamera(def, viewport) {
-    const workspace = displayBox(def, workspaceBounds(def));
-    const initialBox = displayBox(def, { minX: 0, minY: 0, maxX: def.field.width, maxY: def.field.height });
+/** The tray's display box. */
+function trayBox(def) {
+    const xs = def.container.cells.map(c => c[0]), ys = def.container.cells.map(c => c[1]);
+    return displayBox(def, { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs) + 1, maxY: Math.max(...ys) + 1 });
+}
+/** The smallest box centred on the tray that still contains `box`. */
+function aroundTray(def, box) {
+    const tray = trayBox(def), x = (tray.minX + tray.maxX) / 2, y = (tray.minY + tray.maxY) / 2;
+    const w = Math.max(x - Math.min(box.minX, tray.minX), Math.max(box.maxX, tray.maxX) - x);
+    const h = Math.max(y - Math.min(box.minY, tray.minY), Math.max(box.maxY, tray.maxY) - y);
+    return { minX: x - w, maxX: x + w, minY: y - h, maxY: y + h };
+}
+/** Display box of the tray and every piece. */
+function contentBox(def, state) {
+    const cells = [...def.container.cells, ...def.pieces.flatMap(p => placedCells(p, state.placements[p.id]))];
+    const points = cells.map(([x,y]) => displayCell(def,x,y));
+    return { minX: Math.min(...points.map(p=>p[0])), minY: Math.min(...points.map(p=>p[1])), maxX: Math.max(...points.map(p=>p[0]))+1, maxY: Math.max(...points.map(p=>p[1]))+1 };
+}
+/** A fresh attempt laid out for this viewport's shape, in the puzzle's own orientation. */
+export function openingState(def, viewport, pad = 20) {
+    const width = Math.max(1, viewport.width - pad * 2), height = Math.max(1, viewport.height - pad * 2);
+    const turned = (def.presentation?.fieldRotation ?? 0) % 2 === 1;
+    return { placements: arrangePieces(def, turned ? height / width : width / height) };
+}
+/** The opening view is centred on the tray and shows every piece. */
+export function createCamera(def, viewport, state) {
+    const initialBox = aroundTray(def, contentBox(def, state));
+    // Panning room is symmetric about the tray too, so clamping never pushes it off centre.
+    const workspace = aroundTray(def, displayBox(def, workspaceBounds(def)));
     const initialSize = Math.min(46, fit(viewport, initialBox));
     const initial = { x: (initialBox.minX + initialBox.maxX) / 2, y: (initialBox.minY + initialBox.maxY) / 2, size: initialSize };
     return clampCamera({ viewport, workspace, minSize: Math.min(initialSize, fit(viewport, workspace, 12)), maxSize: Math.max(initialSize, 72), initial, ...initial });
@@ -70,12 +97,14 @@ export function zoomAt(camera, factor, point, destination = point) {
 export function panCamera(camera, dx, dy) {
     return clampCamera({ ...camera, x: camera.x - dx / camera.size, y: camera.y - dy / camera.size });
 }
+/** Fit: the closest view that shows the tray and every piece whole. */
 export function reframeCamera(def, state, camera) {
-    const cells = [...def.container.cells, ...def.pieces.flatMap(p => placedCells(p, state.placements[p.id]))];
-    const points = cells.map(([x,y]) => displayCell(def,x,y));
-    const box = { minX: Math.min(...points.map(p=>p[0])), minY: Math.min(...points.map(p=>p[1])), maxX: Math.max(...points.map(p=>p[0]))+1, maxY: Math.max(...points.map(p=>p[1]))+1 };
+    const box = contentBox(def, state);
     return clampCamera({ ...camera, x: (box.minX+box.maxX)/2, y: (box.minY+box.maxY)/2, size: Math.min(46, fit(camera.viewport, box, 28)) });
 }
+export function sameView(a, b) {
+    return Math.abs(a.x-b.x)<0.001 && Math.abs(a.y-b.y)<0.001 && Math.abs(a.size-b.size)<0.001;
+}
 export function cameraIsInitial(c) {
-    return Math.abs(c.x-c.initial.x)<0.001 && Math.abs(c.y-c.initial.y)<0.001 && Math.abs(c.size-c.initial.size)<0.001;
+    return sameView(c, c.initial);
 }

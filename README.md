@@ -24,29 +24,32 @@ Different ports/hostnames have separate browser storage, so their imported packs
 and attempts do not automatically carry across. Use backup/restore to transfer
 personal data between origins or devices.
 
-In production, wait for **Ready for offline play** before disconnecting. Cached
+In production, the first load caches the whole app; nothing is shown about it,
+and the app never needs the network afterwards. Cached
 updates do not interrupt an active game; close old app tabs to allow a waiting
 version to activate. Normal local HTTP/LAN play is supported, but offline
 installation requires a browser and serving origin that support service workers.
 
 ## Play and manage puzzles
 
-Drag a piece continuously and release to snap. Select it to use the bottom
-turn/flip controls. Drag empty canvas to pan; pinch or scroll to zoom. Reframe
-fits all pieces in view. Keyboard shortcuts: **R** clockwise, **Shift+R** or **E**
-counterclockwise, **F** flip when allowed, and **Escape** cancel or clear
-selection. Right-click a movable piece to rotate it.
+Drag a piece continuously and release to snap. Tap a piece to select it, tap it
+again to turn it clockwise, or hold it still until Flip lights up and release to
+flip it. The bottom controls turn and flip the selected piece. Drag empty canvas
+to pan; pinch or scroll to zoom. Reframe fits all pieces in view. Keyboard
+shortcuts: **R** clockwise, **Shift+R** or **E** counterclockwise, **F** flip
+when allowed, and **Escape** cancel or clear selection. Right-click a movable
+piece to rotate it.
 
 Fit every piece in the tray without overlaps. Spare tray cells may be allowed.
 Darkened cells indicate a conflict; matte, seated pieces are locked. Help is
-available from the player dock.
+available from the More (⋯) button below the board.
 
-**Generate puzzle** on the library page builds a new rectangular puzzle with
+**Generate W × H** on Home builds a new rectangular puzzle with
 exactly one solution, from 3×3 up to 9×9, and saves it under Generated puzzles.
 Generation runs in a background worker and can be cancelled.
 
-Import a pack or standalone puzzle from the library. Preview the file before
-adding it; export from pack/puzzle details. Removing a pack retains its progress
+Import a pack or standalone puzzle from the bottom of Collections. Preview the
+file before adding it; export a pack from its "…" actions and a puzzle from Help. Removing a pack retains its progress
 for reimport. Settings provides backup/restore and a separate erase-progress
 action. Content exports exclude personal progress; backups include it.
 

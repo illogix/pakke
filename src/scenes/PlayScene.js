@@ -1,14 +1,14 @@
 import Phaser from 'phaser';
 import { bounds, cellKey, orient, outlineEdges } from '../core/geometry.js';
 import { findPiece, orientedBounds, placedCells } from '../core/puzzle.js';
-import { createState, flipPiece, rotatePiece, setPlacement } from '../core/state.js';
+import { flipOrientation, flipPiece, rotatePiece, setPlacement } from '../core/state.js';
 import { computeViolations } from '../core/violations.js';
 import { isSolved, validProgress } from '../core/completion.js';
 import { clampToWorkspace, snapPlacement } from '../core/workspace.js';
-import { rotatedGrabPoint, flippedGrabPoint } from '../ui/interaction.js';
-import { createCamera, displayCell, displayToScreen, screenToDisplay, screenToWorld, panCamera, zoomAt, reframeCamera, cameraIsInitial, clampCamera } from '../ui/camera.js';
-import { paintMaterial } from '../ui/materials.js';
-import { theme } from '../ui/theme.js';
+import { rotatedGrabPoint, flippedGrabPoint, mirrorIsVertical, pressAction, pressSlop, LONG_PRESS_MS } from '../ui/interaction.js';
+import { createCamera, displayCell, displayToScreen, screenToDisplay, screenToWorld, panCamera, zoomAt, reframeCamera, cameraIsInitial, clampCamera, openingState, sameView } from '../ui/camera.js';
+import { paintMaterial, paintTray } from '../ui/materials.js';
+import { gridAlpha, inkAlpha, pieceColor, theme, watchScheme } from '../ui/theme.js';
 import { storage } from '../app/storage.js';
 
 // Phaser owns the rendering loop. Native captured Pointer Events own gestures.
@@ -21,10 +21,11 @@ export default class PlayScene extends Phaser.Scene {
         this.camera=null;
         this.pixelRatio=this.registry.get('pixelRatio')??1;
         this.cameras.main.setOrigin(0,0).setZoom(this.pixelRatio);
-        this.state=this.saved??createState(this.def);this.selectedId=null;this.gesture=null;this.settling=null;
+        // A fresh attempt is laid out for this screen, and again on resize until the first move.
+        this.fresh=null;this.state=this.saved??(this.fresh=openingState(this.def,this.viewport()));this.selectedId=null;this.gesture=null;this.settling=null;
         this.pointers=new Map();this.solved=isSolved(this.def,this.state);this.pendingCompletion=0;
         this.zOrder=this.def.pieces.map(p=>p.id);this.visuals=new Map();this.geometry=new Map();this.dirty=true;
-        this.board=this.add.graphics();this.footprint=this.add.graphics().setDepth(1);
+        this.board=this.add.graphics();this.footprint=this.add.graphics().setDepth(1);this.tray=null;this.trayCorners=null;
         this.cameras.main.setBackgroundColor(theme.page);
         this.abort=new AbortController();const signal=this.abort.signal;const canvas=this.game.canvas;
         canvas.tabIndex=0;canvas.setAttribute('aria-label','Puzzle board. Drag pieces, pan empty canvas, pinch or scroll to zoom.');
@@ -34,6 +35,8 @@ export default class PlayScene extends Phaser.Scene {
         on(canvas,'pointercancel',e=>{if(this.pointers.has(e.pointerId))this.cancelGesture();});
         on(canvas,'lostpointercapture',e=>{if(this.pointers.has(e.pointerId))this.cancelGesture();});
         on(canvas,'contextmenu',e=>e.preventDefault());
+        // iOS shows its text loupe on a double tap and hold despite user-select; pointer events still follow.
+        on(canvas,'touchstart',e=>e.preventDefault(),{passive:false});
         on(canvas,'wheel',e=>{
             if(e.ctrlKey||e.metaKey||this.gesture||this.shell.dialog.open)return;
             e.preventDefault();const delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?this.camera.viewport.height:1);
@@ -42,6 +45,7 @@ export default class PlayScene extends Phaser.Scene {
         on(window,'keydown',e=>this.keyDown(e));on(window,'blur',()=>this.cancelGesture());
         on(document,'visibilitychange',()=>{if(document.hidden)this.cancelGesture();});
         this.scale.on('resize',this.resize,this);
+        this.unwatchScheme=watchScheme(()=>this.applyScheme());
         this.observer=new ResizeObserver(()=>{
             const host=document.querySelector('#game');
             if(host.clientWidth && host.clientHeight) {
@@ -50,19 +54,21 @@ export default class PlayScene extends Phaser.Scene {
             }
         });this.observer.observe(document.querySelector('#game'));
         this.events.once('shutdown',()=>{
-            this.cancelGesture();this.abort.abort();this.observer.disconnect();this.scale.off('resize',this.resize,this);
-            for(const v of this.visuals.values()) {v.image.destroy();this.textures.remove(v.key);}
-            this.visuals.clear();this.pendingCompletion=0;
+            this.cancelGesture();this.abort.abort();this.observer.disconnect();this.scale.off('resize',this.resize,this);this.unwatchScheme();
+            for(const v of [...this.visuals.values(),this.tray].filter(Boolean)) {v.image.destroy();this.textures.remove(v.key);}
+            this.visuals.clear();this.tray=null;this.pendingCompletion=0;
         });
         this.resize();
         if(this.saved) {this.camera=reframeCamera(this.def,this.state,this.camera);this.cameraChanged();}
         this.refreshStatus();
     }
     reducedMotion() {return storage.read('reduced-motion')===true || matchMedia('(prefers-reduced-motion: reduce)').matches;}
+    viewport() {return {width:Math.max(1,this.scale.width/this.pixelRatio),height:Math.max(1,this.scale.height/this.pixelRatio)};}
     resize() {
         this.cancelGesture();
-        const viewport={width:Math.max(1,this.scale.width/this.pixelRatio),height:Math.max(1,this.scale.height/this.pixelRatio)};
-        const next=createCamera(this.def,viewport);
+        const viewport=this.viewport();
+        if(this.state===this.fresh)this.state=this.fresh=openingState(this.def,viewport);
+        const next=createCamera(this.def,viewport,this.state);
         this.camera=this.camera && !cameraIsInitial(this.camera) ? clampCamera({...next,x:this.camera.x,y:this.camera.y,size:this.camera.size}) : next;
         this.settling=null;this.cameraChanged();
     }
@@ -73,20 +79,31 @@ export default class PlayScene extends Phaser.Scene {
     cameraChanged() {this.drawBoard();this.dirty=true;this.refreshStatus();}
     drawBoard() {
         if(!this.camera)return;
-        const g=this.board,c=this.camera,s=c.size,{width,height}=c.viewport;g.clear();
+        const g=this.board,c=this.camera,{width,height}=c.viewport;g.clear();
+        // Faint dots at lattice points; the tray texture covers those inside it.
         const [left,top]=screenToDisplay(c,0,0);const [right,bottom]=screenToDisplay(c,width,height);
-        g.lineStyle(.7,theme.gridLine,.6);
-        for(let x=Math.floor(left);x<=Math.ceil(right);x++) {const [px]=displayToScreen(c,x,0);g.lineBetween(px,0,px,height);}
-        for(let y=Math.floor(top);y<=Math.ceil(bottom);y++) {const [,py]=displayToScreen(c,0,y);g.lineBetween(0,py,width,py);}
+        // Skip dots on tray corners too: half-covered, they read as stray cell lines.
+        const radius=Math.max(.8,c.size*.04);g.fillStyle(theme.grid,gridAlpha);
         const cells=this.def.container.cells.map(([x,y])=>displayCell(this.def,x,y));
-        g.fillStyle(theme.trayFill);g.lineStyle(1,theme.trayGridLine,.8);
-        for(const [x,y] of cells) {const [px,py]=displayToScreen(c,x,y);g.fillRect(px,py,s,s);g.strokeRect(px,py,s,s);}
-        // Recessed perimeter decorates the shared lattice; it never resizes it.
-        for(const e of outlineEdges(cells)) {
-            const [x1,y1]=displayToScreen(c,e.x1,e.y1),[x2,y2]=displayToScreen(c,e.x2,e.y2);
-            g.lineStyle(4,0x6d776c,.055);g.lineBetween(x1,y1+1,x2,y2+1);
-            g.lineStyle(1.2,this.solved?0x759777:theme.trayStroke,.9);g.lineBetween(x1,y1,x2,y2);
+        const covered=this.trayCorners??=new Set(cells.flatMap(([x,y])=>[cellKey(x,y),cellKey(x+1,y),cellKey(x,y+1),cellKey(x+1,y+1)]));
+        for(let x=Math.floor(Math.min(left,right));x<=Math.ceil(Math.max(left,right));x++)
+            for(let y=Math.floor(Math.min(top,bottom));y<=Math.ceil(Math.max(top,bottom));y++) {
+                if(covered.has(cellKey(x,y)))continue;const [px,py]=displayToScreen(c,x,y);g.fillCircle(px,py,radius);
+            }
+        if(!this.tray) {
+            const key=`tray:${this.def.id}`,canvas=document.createElement('canvas'),metrics=paintTray(canvas,cells);
+            this.textures.addCanvas(key,canvas);this.tray={key,metrics,image:this.add.image(0,0,key).setOrigin(0).setDepth(.5)};
         }
+        const {metrics,image}=this.tray,[px,py]=displayToScreen(c,metrics.box.minX,metrics.box.minY),scale=c.size/metrics.unit;
+        image.setPosition(px-metrics.pad*scale,py-metrics.pad*scale).setScale(scale);
+    }
+    /** Repaint every baked texture in the current colour scheme. */
+    applyScheme() {
+        if(!this.camera)return;
+        this.cameras.main.setBackgroundColor(theme.page);
+        if(this.tray) {this.tray.image.destroy();this.textures.remove(this.tray.key);this.tray=null;}
+        for(const v of this.visuals.values())v.signature=null;
+        this.drawBoard();this.dirty=true;
     }
     visualPlacement(id,now=performance.now()) {
         if(this.gesture?.kind==='piece'&&this.gesture.id===id)return this.gesture.preview;
@@ -116,7 +133,7 @@ export default class PlayScene extends Phaser.Scene {
         this.footprint.clear();
         if(active) {
             const cells=placedCells(findPiece(this.def,active.id),candidate);
-            this.footprint.fillStyle(0x344c42,.07);this.footprint.lineStyle(1,0x344c42,.14);
+            this.footprint.fillStyle(theme.ink,inkAlpha.footprint);this.footprint.lineStyle(1,theme.ink,inkAlpha.footprintEdge);
             for(const [x,y] of cells) {const [px,py]=displayToScreen(this.camera,...displayCell(this.def,x,y));this.footprint.fillRect(px,py,this.camera.size,this.camera.size);}
             for(const e of outlineEdges(cells.map(([x,y])=>displayCell(this.def,x,y)))) {
                 this.footprint.lineBetween(...displayToScreen(this.camera,e.x1,e.y1),...displayToScreen(this.camera,e.x2,e.y2));
@@ -132,13 +149,13 @@ export default class PlayScene extends Phaser.Scene {
             let visual=this.visuals.get(id);
             if(!visual) {
                 const key=`piece:${this.def.id}:${id}`;const canvas=document.createElement('canvas');
-                const metrics=paintMaterial(canvas,geometry.cells,piece.color,options);
+                const metrics=paintMaterial(canvas,geometry.cells,pieceColor(this.def,id),options);
                 this.textures.addCanvas(key,canvas);
                 visual={key,image:this.add.image(0,0,key).setOrigin(0),metrics,signature,canvas};this.visuals.set(id,visual);
             } else if(visual.signature!==signature) {
                 // One texture per piece, bounded memory even after many invalid placements.
                 const scratch=visual.scratch??(visual.scratch=document.createElement('canvas'));
-                visual.metrics=paintMaterial(scratch,geometry.cells,piece.color,options);
+                visual.metrics=paintMaterial(scratch,geometry.cells,pieceColor(this.def,id),options);
                 const texture=this.textures.get(visual.key);texture.setSize(scratch.width,scratch.height);
                 texture.context.clearRect(0,0,scratch.width,scratch.height);texture.context.drawImage(scratch,0,0);texture.refresh();
                 visual.image.setTexture(visual.key);visual.signature=signature;
@@ -151,7 +168,7 @@ export default class PlayScene extends Phaser.Scene {
     refreshStatus() {
         if(!this.camera||!this.shell)return;
         const v=computeViolations(this.def,this.state);
-        this.shell.update({...validProgress(this.def,this.state),selected:!!this.selectedId,dragging:!!this.gesture,initial:cameraIsInitial(this.camera),conflict:v.pieces.has(this.selectedId),solved:this.solved});
+        this.shell.update({...validProgress(this.def,this.state),selected:!!this.selectedId,dragging:!!this.gesture,charged:!!this.gesture?.charged,fitted:sameView(this.camera,reframeCamera(this.def,this.state,this.camera)),conflict:v.pieces.has(this.selectedId),solved:this.solved});
     }
     hit(world) {
         for(const id of [...this.zOrder].reverse()) {
@@ -171,11 +188,11 @@ export default class PlayScene extends Phaser.Scene {
         if(this.pointers.size===2) {
             const [a,b]=[...this.pointers.values()];this.gesture={kind:'pinch',distance:Math.max(1,Math.hypot(a[0]-b[0],a[1]-b[1])),mid:[(a[0]+b[0])/2,(a[1]+b[1])/2],camera:this.camera};this.refreshStatus();return;
         }
-        const common={owner:e.pointerId,start:point,last:point,moved:false,threshold:e.pointerType==='touch'?6:4};
+        const common={owner:e.pointerId,start:point,last:point,moved:false,time:performance.now(),threshold:e.pointerType==='touch'?6:4};
         if(piece&&!piece.locked) {
-            const preview={...this.visualPlacement(piece.id)};this.settling=null;this.selectedId=piece.id;
+            const preview={...this.visualPlacement(piece.id)},wasSelected=this.selectedId===piece.id;this.settling=null;this.selectedId=piece.id;
             this.zOrder=[...this.zOrder.filter(id=>id!==piece.id),piece.id];
-            this.gesture={...common,kind:'piece',id:piece.id,preview,grab:[world[0]-preview.x,world[1]-preview.y]};
+            this.gesture={...common,kind:'piece',id:piece.id,preview,wasSelected,grab:[world[0]-preview.x,world[1]-preview.y]};
         } else {
             this.gesture={...common,kind:piece?.locked?'blocked':'pan',camera:this.camera};
         }
@@ -190,7 +207,10 @@ export default class PlayScene extends Phaser.Scene {
             this.camera=zoomAt(g.camera,distance/g.distance,g.mid,mid);this.cameraChanged();return;
         }
         if(e.pointerId!==g.owner)return;g.last=point;
-        if(Math.hypot(point[0]-g.start[0],point[1]-g.start[1])>=g.threshold)g.moved=true;
+        if(!g.moved&&Math.hypot(point[0]-g.start[0],point[1]-g.start[1])>=pressSlop(g,this.camera.size)) {
+            // Moving a cell or more drops a flip charge and drags as usual.
+            g.moved=true;if(g.charged){g.charged=false;this.refreshStatus();}
+        }
         if(!g.moved)return;
         if(g.kind==='piece') {
             const world=screenToWorld(this.def,this.camera,...point);
@@ -207,11 +227,14 @@ export default class PlayScene extends Phaser.Scene {
         if(g.kind==='pinch') {this.cancelGesture();return;}
         if(g.owner!==e.pointerId)return;
         this.gesture=null;
-        if(g.kind==='piece'&&g.moved) {
+        const action=g.kind==='piece'?pressAction({moved:g.moved,held:performance.now()-g.time,charged:g.charged,wasSelected:g.wasSelected}):null;
+        if(action==='move') {
             const piece=findPiece(this.def,g.id),candidate=snapPlacement(this.def,piece,g.preview);
             this.commit(setPlacement(this.def,this.state,g.id,candidate));
             if(!this.reducedMotion())this.settling={id:g.id,dx:g.preview.x-candidate.x,dy:g.preview.y-candidate.y,time:performance.now()};
-        } else if(g.kind==='pan'&&!g.moved)this.selectedId=null;
+        } else if(action==='rotate')this.transform(1);
+        else if(action==='flip')this.transform('flip');
+        else if(g.kind==='pan'&&!g.moved)this.selectedId=null;
         this.violationSignature=null;this.dirty=true;this.refreshStatus();
     }
     cancelGesture() {
@@ -234,14 +257,16 @@ export default class PlayScene extends Phaser.Scene {
         if(action==='flip'?!this.def.rules.allowFlip:!this.def.rules.allowRotation)return;
         const g=this.gesture;
         if(g&&g.kind!=='piece')return;
+        // Flip mirrors left to right on screen, which is top to bottom in the field when it is shown turned.
+        const vertical=(this.def.presentation?.fieldRotation??0)%2===1;
         if(g?.kind==='piece') {
             const p=g.preview,box=orientedBounds(piece,p);
-            g.grab=action==='flip'?flippedGrabPoint(box,g.grab,p.rotation):rotatedGrabPoint(box,g.grab,action);
+            const next=action==='flip'?{...p,...flipOrientation(this.def,p,vertical)}:{...p,rotation:(p.rotation+action+4)%4};
+            g.grab=action==='flip'?flippedGrabPoint(box,g.grab,mirrorIsVertical(p,next)):rotatedGrabPoint(box,g.grab,action);
             const world=screenToWorld(this.def,this.camera,...g.last);
-            const next=action==='flip'?{...p,flipped:!p.flipped}:{...p,rotation:(p.rotation+action+4)%4};
-            g.preview=clampToWorkspace(this.def,piece,{...next,x:world[0]-g.grab[0],y:world[1]-g.grab[1]});g.moved=true;this.dirty=true;
+            g.preview=clampToWorkspace(this.def,piece,{...next,x:world[0]-g.grab[0],y:world[1]-g.grab[1]});g.moved=true;g.charged=false;this.dirty=true;this.refreshStatus();
         } else {
-            this.settling=null;this.commit(action==='flip'?flipPiece(this.def,this.state,piece.id):rotatePiece(this.def,this.state,piece.id,action));
+            this.settling=null;this.commit(action==='flip'?flipPiece(this.def,this.state,piece.id,vertical):rotatePiece(this.def,this.state,piece.id,action));
         }
     }
     commit(state) {
@@ -253,13 +278,17 @@ export default class PlayScene extends Phaser.Scene {
     }
     resetPuzzle() {
         this.cancelGesture();this.settling=null;this.selectedId=null;this.zOrder=this.def.pieces.map(p=>p.id);
-        this.commit(createState(this.def));this.camera=createCamera(this.def,this.camera.viewport);this.cameraChanged();
+        this.commit(openingState(this.def,this.camera.viewport));this.fresh=this.state;
+        this.camera=createCamera(this.def,this.camera.viewport,this.state);this.cameraChanged();
     }
     reframe() {this.cancelGesture();this.camera=reframeCamera(this.def,this.state,this.camera);this.cameraChanged();}
     update() {
         if(!this.def||!this.camera)return;
         const now=performance.now();
         if(this.settling) {this.dirty=true;if(now-this.settling.time>=110)this.settling=null;}
+        // A long, still press charges a flip, shown by enabling the Flip button until release.
+        const g=this.gesture;
+        if(g?.kind==='piece'&&!g.moved&&!g.charged&&this.def.rules.allowFlip&&now-g.time>=LONG_PRESS_MS) {g.charged=true;this.refreshStatus();}
         if(this.dirty) {this.drawPieces();this.dirty=false;}
         if(this.pendingCompletion && now>=this.pendingCompletion && !this.gesture && !this.shell.dialog.open) {
             this.pendingCompletion=0;this.shell.completion(this.def);

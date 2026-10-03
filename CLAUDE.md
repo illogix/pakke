@@ -24,7 +24,7 @@ untracked, so it is present locally but never committed.
   solver and the unique-solution puzzle generator (`solver.js`, `generate.js`).
 - `src/puzzles/` — bundled JSON definitions and explicitly ordered pack manifest
 - `src/library/` — content identity, exchange validation, revision-aware library model and IndexedDB repository; no Phaser imports
-- `src/app/` — player shell, library UI, generate sheet and its Web Worker, offline registration, legacy-save migration adapter
+- `src/app/` — player shell, Home and Collections UI, generator controls and their Web Worker, offline registration, legacy-save migration adapter
 - `src/ui/` — camera/interaction math, theme, silhouettes, materials, and icons.
   Math is pure; material/icon helpers also use browser canvas/DOM APIs.
 - `src/scenes/` — Phaser scenes, default-exported classes extending `Phaser.Scene`

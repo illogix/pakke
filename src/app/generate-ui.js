@@ -1,4 +1,4 @@
-// The Generate sheet: pick a board size, generate a unique-solution puzzle in a
+// New puzzle on Home: pick a board size, generate a unique-solution puzzle in a
 // worker, save it to Generated puzzles, and open it.
 import { iconButton } from '../ui/icons.js';
 import { GENERATOR_LIMITS, generatePuzzle } from '../core/generate.js';
@@ -11,33 +11,32 @@ const element = (tag, value = '', className = '') => {
 // Remembered for the session only; library preferences allowlist just player settings.
 const session = { width: GENERATOR_LIMITS.defaultWidth, height: GENERATOR_LIMITS.defaultHeight, allowHoles: false };
 
-export function openGenerateSheet(shell, library) {
-    shell.showSheet('Generate a puzzle', body => {
-        body.append(element('p', 'A fresh tray with exactly one way to fill it. Pieces can be turned and flipped. They are saved under Generated puzzles.'));
-        body.append(stepper('Width', 'width'), stepper('Height', 'height'));
-        // Future option: an "Allow holes" checkbox belongs here; `session.allowHoles` is passed but ignored by the generator for now.
-        const row = element('div', '', 'sheet-actions');
-        row.append(library.action('Generate', () => generate(shell, library), 'text-button primary'));
-        body.append(row);
-    });
+export function newPuzzleSection(shell, library) {
+    const section = element('section', '', 'section'), heading = element('h2', 'New puzzle', 'section-label');
+    heading.id = 'new-puzzle'; section.setAttribute('aria-labelledby', heading.id);
+    const steppers = element('div', '', 'steppers');
+    // Future option: an "Allow holes" toggle belongs here; `session.allowHoles` is passed but ignored by the generator for now.
+    const button = element('button', '', 'primary-button'); button.type = 'button'; button.dataset.generate = '';
+    const label = () => { button.textContent = `Generate ${session.width} × ${session.height}`; };
+    steppers.append(stepper('Width', 'width', label), stepper('Height', 'height', label));
+    button.addEventListener('click', () => generate(shell, library)); label();
+    section.append(heading, steppers, button);
+    return section;
 }
 
-function stepper(label, key) {
+function stepper(label, key, changed) {
     const { minSize, maxSize } = GENERATOR_LIMITS;
-    const row = element('div', '', 'stepper'), id = `generate-${key}`;
-    const name = element('label', label); name.htmlFor = id;
-    const input = document.createElement('input');
-    input.type = 'number'; input.id = id; input.inputMode = 'numeric'; input.min = minSize; input.max = maxSize; input.step = 1; input.value = session[key];
+    const row = element('div', '', 'stepper'), name = element('span', label, 'stepper-label'), controls = element('span', '', 'stepper-controls');
+    row.setAttribute('role', 'group'); row.setAttribute('aria-label', label);
+    const value = element('output'); value.setAttribute('aria-live', 'polite'); value.setAttribute('aria-label', label);
     const minus = iconButton('minus', `Decrease ${label.toLowerCase()}`, () => set(session[key] - 1));
     const plus = iconButton('plus', `Increase ${label.toLowerCase()}`, () => set(session[key] + 1));
-    const set = value => {
-        const clamped = Math.min(maxSize, Math.max(minSize, Number.isInteger(value) ? value : session[key]));
-        session[key] = clamped; input.value = clamped; minus.disabled = clamped <= minSize; plus.disabled = clamped >= maxSize;
+    const set = next => {
+        session[key] = Math.min(maxSize, Math.max(minSize, next)); value.textContent = session[key];
+        minus.disabled = session[key] <= minSize; plus.disabled = session[key] >= maxSize; changed();
     };
-    input.addEventListener('input', () => { const value = Number(input.value); if (Number.isInteger(value) && value >= minSize && value <= maxSize) set(value); });
-    input.addEventListener('blur', () => set(Number(input.value)));
     set(session[key]);
-    row.append(name, minus, input, plus);
+    controls.append(minus, value, plus); row.append(name, controls);
     return row;
 }
 
@@ -45,19 +44,19 @@ function generate(shell, library) {
     const { width, height, allowHoles } = session;
     const seed = randomSeed();
     let worker = null, settled = false;
-    const status = element('p', `Generating ${width}×${height}…`); status.setAttribute('aria-live', 'polite');
+    const status = element('p', `${width} × ${height}`, 'secondary'); status.setAttribute('aria-live', 'polite');
     const stop = () => { settled = true; worker?.terminate(); };
     shell.showSheet('Generating', body => {
         body.append(status);
         const row = element('div', '', 'sheet-actions');
-        row.append(library.action('Cancel', () => { stop(); openGenerateSheet(shell, library); }));
+        row.append(library.action('Cancel', () => { stop(); shell.closeSheet(); }));
         body.append(row);
     });
     shell.dialog.addEventListener('close', stop, { once: true });
     const finish = async result => {
         if (settled) return;
         stop();
-        if (!result.ok) { failed(shell, library, `Couldn't find a unique ${width}×${height} puzzle in time. Try a smaller board.`); return; }
+        if (!result.ok) { failed(shell, library, `No unique ${width} × ${height} puzzle found in time.`); return; }
         try {
             const content = await inspectContent(result.def);
             await shell.repo.mutate(state => applyImport(state, previewImport(state, content)));
@@ -69,7 +68,7 @@ function generate(shell, library) {
     try {
         worker = new Worker(new URL('./generator.worker.js', import.meta.url), { type: 'module' });
         worker.onmessage = ({ data }) => {
-            if (data.type === 'progress') status.textContent = `Generating ${width}×${height}… ${data.pieces} pieces, ${data.merges} ${data.merges === 1 ? 'merge' : 'merges'}`;
+            if (data.type === 'progress') status.textContent = `${width} × ${height} · ${data.pieces} pieces · ${data.merges} ${data.merges === 1 ? 'merge' : 'merges'}`;
             else if (data.type === 'done') finish(data.result);
             else if (data.type === 'error') fail(data.message);
         };
@@ -85,7 +84,9 @@ function failed(shell, library, message) {
     shell.showSheet('No puzzle this time', body => {
         body.append(element('p', message));
         const row = element('div', '', 'sheet-actions');
-        row.append(library.action('Try again', () => generate(shell, library), 'text-button primary'), library.action('Change size', () => openGenerateSheet(shell, library)));
+        row.append(library.action('Try again', () => generate(shell, library), 'text-button primary'), library.action('Change size', () => {
+            shell.closeSheet(); shell.screen.querySelector('.stepper button')?.focus();
+        }));
         body.append(row);
     });
 }

@@ -70,6 +70,15 @@ export function orient(cells, rotation = 0, flipped = false) {
     return out;
 }
 
+/**
+ * The orientation that mirrors `orient(cells, rotation, flipped)` across a
+ * vertical axis, or a horizontal one when `vertical`. A mirror reverses turns,
+ * so the rotation negates as the flip toggles; a horizontal axis adds a half turn.
+ */
+export function mirrorOrientation(rotation, flipped, vertical = false) {
+    return { rotation: ((((vertical ? 2 : 0) - rotation) % 4) + 4) % 4, flipped: !flipped };
+}
+
 export function cellsEqual(a, b) {
     if (a.length !== b.length) return false;
 

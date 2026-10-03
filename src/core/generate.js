@@ -9,8 +9,8 @@
 // Pieces may not grow past a size cap, though, so a carving that needs a bigger
 // piece to become unique is thrown away and the tray carved afresh.
 
-import { bounds, cellKey, isConnected, normalise, orient, translate } from './geometry.js';
-import { deriveField } from './puzzle.js';
+import { bounds, cellKey, isConnected, normalise, orient } from './geometry.js';
+import { stagePieces } from './puzzle.js';
 import { validatePuzzle } from './validate.js';
 import { createRandom } from './random.js';
 import { shapeMultiset } from './shapes.js';
@@ -52,10 +52,9 @@ export const GENERATED_RULES = Object.freeze({
     completion: 'all-pieces-contained'
 });
 
-const PALETTE = [
-    '#629daf', '#dbad51', '#6bbf59', '#e2574c', '#8a6cd1',
-    '#e8833a', '#43b3a0', '#dd6693', '#5a7fd0', '#b5c94f'
-];
+// Uncoloured pieces take the theme's six palette colours in definition order
+// (src/ui/theme.js), so piece order decides colour.
+const PALETTE_SIZE = 6;
 
 const MARGIN = 2;
 
@@ -294,14 +293,9 @@ function mergeOnce(pieces, other, limits, random) {
 
 /** Turn a partition into a playable definition plus the placements that solve it. */
 function emit(pieces, { width, height, seed, createdAt }, random) {
-    const ordered = random.shuffle(pieces);
-    const colors = colourPieces(ordered);
+    const ordered = paletteOrder(pieces, random);
     const defPieces = [];
     const solution = [];
-    const rowWidth = Math.max(width, 10) + 2;
-    let x = MARGIN;
-    let y = MARGIN + height + 2;
-    let rowHeight = 0;
 
     ordered.forEach((cells, index) => {
         const id = `p${index + 1}`;
@@ -310,26 +304,10 @@ function emit(pieces, { width, height, seed, createdAt }, random) {
         // give away how it sits in the solution.
         const stored = orient(shape, random.int(4), random.next() < 0.5);
         const { rotation, flipped } = orientationBack(stored, shape);
-        const box = bounds(stored);
         const at = bounds(cells);
 
-        if (x > MARGIN && x + box.width > MARGIN + rowWidth) {
-            y += rowHeight + 1;
-            x = MARGIN;
-            rowHeight = 0;
-        }
-
-        defPieces.push({
-            id,
-            cells: stored,
-            color: colors[index],
-            start: { x, y, rotation: 0, flipped: false },
-            locked: false
-        });
-        solution.push({ pieceId: id, x: at.minX + MARGIN, y: at.minY + MARGIN, rotation, flipped });
-
-        x += box.width + 1;
-        rowHeight = Math.max(rowHeight, box.height);
+        defPieces.push({ id, cells: stored, start: { x: 0, y: 0, rotation: 0, flipped: false }, locked: false });
+        solution.push({ pieceId: id, x: at.minX, y: at.minY, rotation, flipped });
     });
 
     const def = {
@@ -342,15 +320,16 @@ function emit(pieces, { width, height, seed, createdAt }, random) {
             description: `Seed ${seed.toString(36)} · ${pieces.length} pieces · exactly one way to fill the tray.`,
             tags: ['generated']
         },
-        container: { cells: translate(rectangle(width, height), MARGIN, MARGIN) },
+        container: { cells: rectangle(width, height) },
         rules: { ...GENERATED_RULES },
         pieces: defPieces,
         presentation: { fieldRotation: 0 }
     };
 
-    def.field = deriveField(def);
+    const staged = stagePieces(def, { border: MARGIN });
+    const [dx, dy] = staged.offset;
 
-    return { def, solution };
+    return { def: staged.def, solution: solution.map((p) => ({ ...p, x: p.x + dx, y: p.y + dy })) };
 }
 
 /** Local date and time as `YYYY-MM-DD HH:MM:SS`. */
@@ -374,27 +353,50 @@ function orientationBack(stored, target) {
     throw new Error('stored orientation does not reach the solution shape');
 }
 
-/** Greedy colouring so neighbouring pieces in the solution never share a colour. */
-function colourPieces(pieces) {
+/**
+ * Shuffle the pieces, then swap them until no two neighbours in the solution
+ * sit a multiple of the palette size apart, so they never share a colour.
+ * Gives up after a bounded search; a rare clash is cosmetic.
+ */
+function paletteOrder(pieces, random) {
     const ownerOf = new Map();
 
     pieces.forEach((piece, index) => piece.forEach(([x, y]) => ownerOf.set(cellKey(x, y), index)));
 
-    const colors = [];
+    const edges = new Set();
 
     pieces.forEach((piece, index) => {
-        const taken = new Set();
-
         for (const [x, y] of piece) {
             for (const [dx, dy] of STEPS) {
                 const other = ownerOf.get(cellKey(x + dx, y + dy));
 
-                if (other !== undefined && other < index) taken.add(colors[other]);
+                if (other !== undefined && other > index) edges.add(`${index},${other}`);
             }
         }
-
-        colors.push(PALETTE.find((color) => !taken.has(color)) ?? PALETTE[index % PALETTE.length]);
     });
 
-    return colors;
+    const pairs = [...edges].map((edge) => edge.split(',').map(Number));
+    const order = random.shuffle(pieces.map((_, index) => index));
+    const slot = new Array(pieces.length);
+    const clashes = () => pairs.filter(([a, b]) => slot[a] % PALETTE_SIZE === slot[b] % PALETTE_SIZE).length;
+    const place = () => order.forEach((piece, position) => { slot[piece] = position; });
+
+    place();
+
+    let best = clashes();
+
+    for (let attempt = 0; best > 0 && attempt < 200; attempt++) {
+        const p = random.int(order.length);
+        const q = random.int(order.length);
+
+        [order[p], order[q]] = [order[q], order[p]];
+        place();
+
+        const next = clashes();
+
+        if (next <= best) best = next;
+        else { [order[p], order[q]] = [order[q], order[p]]; place(); }
+    }
+
+    return order.map((index) => pieces[index]);
 }

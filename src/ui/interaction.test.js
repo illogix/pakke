@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { cellKey } from '../core/geometry.js';
+import { cellKey, mirrorOrientation } from '../core/geometry.js';
 import { orientedBounds, placedCells } from '../core/puzzle.js';
 import { createState, setPlacement } from '../core/state.js';
-import { flippedGrab, rotatedGrab, topPieceAt } from './interaction.js';
+import { flippedGrab, LONG_PRESS_MS, mirrorIsVertical, pressAction, pressSlop, rotatedGrab, topPieceAt } from './interaction.js';
 
 function makeDef(pieces) {
     return {
@@ -83,10 +83,21 @@ describe('grab offsets keep the cursor cell covered', () => {
         }));
     });
 
-    it.each(cases)('%s at rotation %#: flipping', (name, cells, rotation, flipped) => {
+    for (const vertical of [false, true]) {
+        it.each(cases)(`%s at rotation %#: mirroring ${vertical ? 'top to bottom' : 'left to right'}`, (name, cells, rotation, flipped) => {
+            expectCursorHeld(cells, rotation, flipped, (bounds, grab) => ({
+                grab: flippedGrab(bounds, grab, vertical),
+                change: mirrorOrientation(rotation, flipped, vertical)
+            }));
+        });
+    }
+
+    // With rotation disallowed only the flip toggles, mirroring along the axis the rotation decides.
+    it.each(cases)('%s at rotation %#: toggling the flip alone', (name, cells, rotation, flipped) => {
+        const after = { rotation, flipped: !flipped };
         expectCursorHeld(cells, rotation, flipped, (bounds, grab) => ({
-            grab: flippedGrab(bounds, grab, rotation),
-            change: { flipped: !flipped }
+            grab: flippedGrab(bounds, grab, mirrorIsVertical({ rotation }, after)),
+            change: after
         }));
     });
 });
@@ -129,9 +140,35 @@ it('continuous grab transforms preserve interior points across turns and flips',
                     const inverse=rotatedGrabPoint(orientedBounds(target,{...start,rotation:(rotation+dir+4)%4}),next,-dir);
                     expect(inverse[0]).toBeCloseTo(grab[0]);expect(inverse[1]).toBeCloseTo(grab[1]);
                 }
-                const next=flippedGrabPoint(box,grab,rotation);
-                expect(placedCells(target,{...start,flipped:!flipped}).map(c=>c.join(','))).toContain([Math.floor(next[0]),Math.floor(next[1])].join(','));
+                for(const vertical of [false,true]) {
+                    const next=flippedGrabPoint(box,grab,vertical);
+                    expect(placedCells(target,{...start,...mirrorOrientation(rotation,flipped,vertical)}).map(c=>c.join(','))).toContain([Math.floor(next[0]),Math.floor(next[1])].join(','));
+                }
             }
         }
     }
+});
+
+describe('pressAction', () => {
+    it('selects on a first tap, turns on a tap of the selected piece, and flips on a charged press', () => {
+        expect(pressAction({ moved: false, held: 120, charged: false, wasSelected: false })).toBe('select');
+        expect(pressAction({ moved: false, held: 120, charged: false, wasSelected: true })).toBe('rotate');
+        expect(pressAction({ moved: false, held: LONG_PRESS_MS, charged: true, wasSelected: false })).toBe('flip');
+        expect(pressAction({ moved: false, held: LONG_PRESS_MS + 400, charged: true, wasSelected: true })).toBe('flip');
+    });
+
+    it('does nothing on a long press where flipping is not allowed', () => {
+        expect(pressAction({ moved: false, held: LONG_PRESS_MS, charged: false, wasSelected: true })).toBe('none');
+    });
+
+    it('lets a charged press drift up to a cell before it becomes a drag', () => {
+        expect(pressSlop({ threshold: 6, charged: false }, 40)).toBe(6);
+        expect(pressSlop({ threshold: 6, charged: true }, 40)).toBe(40);
+        expect(pressSlop({ threshold: 6, charged: true }, 3)).toBe(6);
+    });
+
+    it('treats any press that passed the drag threshold as a move, even one returned to its start', () => {
+        expect(pressAction({ moved: true, held: 80, charged: false, wasSelected: true })).toBe('move');
+        expect(pressAction({ moved: true, held: LONG_PRESS_MS * 2, charged: false, wasSelected: false })).toBe('move');
+    });
 });

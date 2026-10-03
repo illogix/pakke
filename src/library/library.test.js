@@ -163,8 +163,10 @@ it('the three introductory puzzles have simple, verified solutions', () => {
         ['first-fit', [['a', 2, 2, 0, false], ['b', 2, 3, 0, false]]],
         ['little-turn', [['a', 2, 2, 0, false]]], ['other-side', [['a', 2, 2, 0, true]]]
     ]) {
+        // Placements are given relative to a tray whose corner sits at (2, 2).
         const d = puzzleById(id); let state = createState(d);
-        for (const [piece, x, y, rotation, flipped] of placements) state = setPlacement(d, state, piece, { x, y, rotation, flipped });
+        const dx = Math.min(...d.container.cells.map(c => c[0])) - 2, dy = Math.min(...d.container.cells.map(c => c[1])) - 2;
+        for (const [piece, x, y, rotation, flipped] of placements) state = setPlacement(d, state, piece, { x: x + dx, y: y + dy, rotation, flipped });
         expect(isSolved(d, state), id).toBe(true);
     }
 });

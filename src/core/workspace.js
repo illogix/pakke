@@ -1,5 +1,7 @@
-// Runtime staging bounds are wider than the authored schema-1 field.
+// Runtime staging bounds are wider than the authored schema-1 field: they also
+// hold any opening arrangement around the tray, whatever the screen shape.
 import { orientedBounds } from './puzzle.js';
+import { arrangeReach, trayBounds } from './arrange.js';
 
 export function workspaceBounds(def) {
     let margin = 4;
@@ -7,7 +9,9 @@ export function workspaceBounds(def) {
         const { width, height } = orientedBounds(piece, piece.start);
         margin = Math.max(margin, width, height);
     }
-    return { minX: -margin, minY: -margin, maxX: def.field.width + margin, maxY: def.field.height + margin };
+    const tray = trayBounds(def), reach = arrangeReach(def);
+    return { minX: Math.min(-margin, tray.minX - reach), minY: Math.min(-margin, tray.minY - reach),
+        maxX: Math.max(def.field.width + margin, tray.maxX + 1 + reach), maxY: Math.max(def.field.height + margin, tray.maxY + 1 + reach) };
 }
 
 /** Supports fractional view previews; committed state rounds before calling. */

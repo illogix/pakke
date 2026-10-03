@@ -37,18 +37,51 @@ export function rotatedGrab({ width, height }, [gx, gy], direction) {
 }
 
 /**
- * Where the grabbed cell ends up after a flip. Orientation applies the flip
- * before the rotation, so at an odd rotation toggling `flipped` mirrors what is
- * on screen vertically rather than horizontally.
+ * Where the grabbed cell ends up after a mirror: left to right, or top to
+ * bottom when `vertical`.
  */
-export function flippedGrab({ width, height }, [gx, gy], rotation) {
-    return rotation % 2 === 0 ? [width - 1 - gx, gy] : [gx, height - 1 - gy];
+export function flippedGrab({ width, height }, [gx, gy], vertical) {
+    return vertical ? [gx, height - 1 - gy] : [width - 1 - gx, gy];
 }
 
 /** Continuous points rotate about box edges, unlike cell indices above. */
 export function rotatedGrabPoint({ width, height }, [x, y], direction) {
     return direction > 0 ? [height - y, x] : [y, width - x];
 }
-export function flippedGrabPoint({ width, height }, [x, y], rotation) {
-    return rotation % 2 === 0 ? [width - x, y] : [x, height - y];
+export function flippedGrabPoint({ width, height }, [x, y], vertical) {
+    return vertical ? [x, height - y] : [width - x, y];
+}
+
+/**
+ * Whether a change of orientation mirrors top to bottom. Composing one
+ * orientation with the inverse of another leaves a mirror turned by the sum of
+ * their rotations: none for left to right, a half turn for top to bottom.
+ */
+export function mirrorIsVertical(before, after) {
+    return (before.rotation + after.rotation) % 4 === 2;
+}
+
+/** A long press is held this long without moving. */
+export const LONG_PRESS_MS = 500;
+
+/**
+ * What releasing a piece without dragging it does. A press held long enough on
+ * a flippable piece is charged and flips; held as long where flipping is not
+ * allowed it does nothing. A tap on the already selected piece turns it
+ * clockwise, and any other tap selects it. A press that moved past its
+ * threshold is a move even if it came back.
+ */
+export function pressAction({ moved, held, charged, wasSelected }) {
+    if (moved) return 'move';
+    if (charged) return 'flip';
+    if (held >= LONG_PRESS_MS) return 'none';
+    return wasSelected ? 'rotate' : 'select';
+}
+
+/**
+ * How far, in CSS pixels, a press may stray before it becomes a drag. A charged
+ * press tolerates up to a cell, so a steady hold survives a drifting finger.
+ */
+export function pressSlop({ threshold, charged }, cellSize) {
+    return charged ? Math.max(threshold, cellSize) : threshold;
 }

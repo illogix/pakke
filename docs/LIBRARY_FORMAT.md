@@ -48,6 +48,9 @@ can belong to multiple packs, with each pack retaining its exact definition.
   starts, and compatible feature declarations are checked.
 - Unknown required features and unsupported rule/piece fields are refused.
   Optional supported metadata and other permitted JSON data survive export.
+- A piece `color` is optional; when present it must be a 3- or 6-digit hex
+  colour. Uncoloured pieces take the theme's palette, and export leaves them
+  uncoloured.
 - Any hard error rejects the entire file. Warnings are visible and nonblocking;
   they are not a solvability verdict.
 - Draft-marked content is refused by the player. A stable authoring-draft
@@ -68,6 +71,9 @@ Coordinate-list order and piece-list order are normalized for gameplay identity.
 Metadata, colors, and presentation do not change that identity. Field bounds do:
 changing them can change the set of valid saved placements. Stored shape/start
 changes produce a new gameplay key even if an author considers them equivalent.
+The player uses a free piece's start for its rotation and flip only; it lays out
+staged pieces for the screen at run time. Starts inside the tray, and locked
+pieces, keep their position. The stored positions still have to be valid.
 A portable hashing fallback supports local HTTP/LAN environments without
 SubtleCrypto; these IDs do not authenticate content.
 
@@ -153,7 +159,7 @@ while preserving file and identity semantics.
 
 `scripts/offline-plugin.js` builds a service worker from the actual emitted
 production files. Installation caches the whole application before activation;
-the UI reports readiness once controlled. Updates use the worker lifecycle and
+the UI shows no offline status. Updates use the worker lifecycle and
 do not force activation during play; close old app tabs to allow a waiting
 version to take over. Development does not register this cache.
 

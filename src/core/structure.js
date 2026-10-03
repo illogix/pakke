@@ -31,7 +31,8 @@ export function structuralErrors(def) {
         const s = p.start;
         if (!s || !integer(s.x) || !integer(s.y) || s.x < 0 || s.y < 0 || !Number.isInteger(s.rotation) || s.rotation < 0 || s.rotation > 3 || typeof s.flipped !== 'boolean') errors.push(`piece "${p.id}" has an invalid start`);
         if (typeof p.locked !== 'boolean') errors.push(`piece "${p.id}" has invalid locked flag`);
-        if (typeof p.color !== 'string' || !/^#([a-f0-9]{3}|[a-f0-9]{6})$/i.test(p.color)) errors.push(`piece "${p.id}" has invalid color`);
+        // Optional: pieces without a colour take the theme's palette.
+        if (p.color !== undefined && (typeof p.color !== 'string' || !/^#([a-f0-9]{3}|[a-f0-9]{6})$/i.test(p.color))) errors.push(`piece "${p.id}" has invalid color`);
     }
     if (count > 4096) errors.push('total piece area exceeds 4096 cells');
     return errors;

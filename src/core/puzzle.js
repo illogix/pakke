@@ -57,6 +57,86 @@ export function deriveField(def, border = FIELD_BORDER) {
     return { width: maxX + 1 + border, height: maxY + 1 + border };
 }
 
+/**
+ * Lay out the free pieces' starts around the tray: the first half by area in
+ * rows below it, the rest in rows above, each row centred on the tray, one empty row from it. Locked
+ * pieces keep their place relative to the tray. Everything is then shifted so the
+ * leading border matches the trailing one, and the field is rederived.
+ * Returns the new definition and the shift applied to the tray.
+ */
+export function stagePieces(def, { gap = 1, minRowWidth = 10, border = FIELD_BORDER } = {}) {
+    const tray = bounds(def.container.cells);
+    const centre = tray.minX + tray.width / 2;
+    const rowWidth = Math.max(minRowWidth, tray.width + 4);
+    const free = def.pieces.filter((piece) => !piece.locked);
+    const half = free.reduce((sum, piece) => sum + piece.cells.length, 0) / 2;
+    // Contiguous halves, so each side runs through the palette in order: split
+    // where the area below comes closest to half, below taking ties.
+    let split = 0;
+    let closest = half;
+    let area = 0;
+
+    free.forEach((piece, index) => {
+        area += piece.cells.length;
+        if (Math.abs(area - half) <= closest) {
+            split = index + 1;
+            closest = Math.abs(area - half);
+        }
+    });
+
+    const sides = { below: free.slice(0, split), above: free.slice(split) };
+
+    const starts = new Map();
+
+    for (const [side, pieces] of Object.entries(sides)) {
+        const rows = [];
+
+        for (const piece of pieces) {
+            const box = orientedBounds(piece, piece.start);
+            const row = rows.at(-1);
+
+            if (row && row.width + 1 + box.width <= rowWidth) {
+                row.items.push({ piece, box });
+                row.width += 1 + box.width;
+                row.height = Math.max(row.height, box.height);
+            } else {
+                rows.push({ items: [{ piece, box }], width: box.width, height: box.height });
+            }
+        }
+
+        let edge = side === 'below' ? tray.maxY + 1 + gap : tray.minY - gap;
+
+        for (const row of rows) {
+            let x = Math.round(centre - row.width / 2);
+            const top = side === 'below' ? edge : edge - row.height;
+
+            for (const { piece, box } of row.items) {
+                // Rows hug the tray: pieces align to the row edge nearest it.
+                const y = side === 'below' ? top : top + row.height - box.height;
+
+                starts.set(piece.id, { ...piece.start, x: x - box.minX, y: y - box.minY });
+                x += box.width + 1;
+            }
+            edge = side === 'below' ? edge + row.height + 1 : edge - row.height - 1;
+        }
+    }
+
+    const staged = def.pieces.map((piece) => ({ ...piece, start: starts.get(piece.id) ?? piece.start }));
+    const all = [...def.container.cells, ...staged.flatMap((piece) => placedCells(piece, piece.start))];
+    const box = bounds(all);
+    const dx = border - box.minX;
+    const dy = border - box.minY;
+    const next = {
+        ...def,
+        container: { ...def.container, cells: translate(def.container.cells, dx, dy) },
+        pieces: staged.map((piece) => ({ ...piece, start: { ...piece.start, x: piece.start.x + dx, y: piece.start.y + dy } }))
+    };
+
+    next.field = deriveField(next, border);
+
+    return { def: next, offset: [dx, dy] };
+}
+
 /** Clamp a placement's origin so the whole piece stays inside the field. */
 export function clampToField(def, piece, placement) {
     const { width, height } = orientedBounds(piece, placement);

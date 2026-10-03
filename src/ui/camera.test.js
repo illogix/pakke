@@ -1,9 +1,15 @@
 import { describe,it,expect } from 'vitest';
+import { bounds } from '../core/geometry.js';
 import demo from '../puzzles/demo01.json';
 import pent from '../puzzles/pent01.json';
 import { createState, movePiece } from '../core/state.js';
 import { workspaceBounds } from '../core/workspace.js';
-import { createCamera, clampCamera, displayPoint, canonicalPoint, worldToScreen, screenToWorld, displayCell, displayToScreen, zoomAt, panCamera, reframeCamera } from './camera.js';
+import { placedCells } from '../core/puzzle.js';
+import { createCamera as cameraFor, openingState, clampCamera, displayPoint, canonicalPoint, worldToScreen, screenToWorld, displayCell, displayToScreen, zoomAt, panCamera, reframeCamera } from './camera.js';
+
+const createCamera=(def,viewport)=>cameraFor(def,viewport,openingState(def,viewport));
+const cellsOnScreen=(def,state,c)=>[...def.container.cells,...def.pieces.flatMap(p=>placedCells(p,state.placements[p.id]))]
+    .flatMap(([x,y])=>[worldToScreen(def,c,x,y),worldToScreen(def,c,x+1,y+1)]);
 
 for(const rotation of [0,1,2,3]) describe(`camera rotation ${rotation}`,()=>{
     const def={...demo,presentation:{fieldRotation:rotation}};
@@ -50,9 +56,42 @@ it('reframes a saved piece at the negative workspace boundary without moving it'
         const [x,y]=worldToScreen(demo,c,...p);expect(x).toBeGreaterThanOrEqual(0);expect(x).toBeLessThanOrEqual(320);expect(y).toBeGreaterThanOrEqual(0);expect(y).toBeLessThanOrEqual(430);
     }
 });
-it.each([demo,pent])('fits authored layouts without a clipping minimum cell size ($id)',def=>{
+it.each([demo,pent])('opens on the arranged pieces without a clipping minimum cell size ($id)',def=>{
     for(const viewport of [{width:320,height:350},{width:844,height:270},{width:90,height:30}]) {
-        const c=createCamera(def,viewport);expect(c.size*def.field.width).toBeLessThanOrEqual(viewport.width);expect(c.size*def.field.height).toBeLessThanOrEqual(viewport.height);
+        const state=openingState(def,viewport),c=cameraFor(def,viewport,state);
+        for(const [x,y] of cellsOnScreen(def,state,c)) {
+            expect(x).toBeGreaterThanOrEqual(-1e-9);expect(x).toBeLessThanOrEqual(viewport.width+1e-9);
+            expect(y).toBeGreaterThanOrEqual(-1e-9);expect(y).toBeLessThanOrEqual(viewport.height+1e-9);
+        }
         expect(panCamera(c,1e9,-1e9).x).toBeLessThan(c.workspace.maxX);
     }
+});
+const trayCentre=(d,c)=>{
+    const corners=d.container.cells.flatMap(([x,y])=>[worldToScreen(d,c,x,y),worldToScreen(d,c,x+1,y+1)]);
+    const xs=corners.map(p=>p[0]),ys=corners.map(p=>p[1]);
+    return [(Math.min(...xs)+Math.max(...xs))/2,(Math.min(...ys)+Math.max(...ys))/2];
+};
+it.each([demo,pent])('opens with the tray in the middle of the view ($id)',def=>{
+    for(const rotation of [0,1]) for(const viewport of [{width:390,height:600},{width:1280,height:720},{width:2400,height:1600}]) {
+        const d={...def,presentation:{fieldRotation:rotation}};
+        const [x,y]=trayCentre(d,createCamera(d,viewport));expect(x).toBeCloseTo(viewport.width/2,6);expect(y).toBeCloseTo(viewport.height/2,6);
+    }
+});
+it.each([0,1])('fits tightly around the tray and pieces, wherever they are (rotation %i)',rotation=>{
+    const d={...pent,presentation:{fieldRotation:rotation}},viewport={width:390,height:600};
+    const c=createCamera(d,viewport),tray=bounds(d.container.cells);
+    // Every free piece in a block above the tray as displayed: Fit no longer centres the tray.
+    let state=openingState(d,viewport);
+    for(const [i,p] of d.pieces.entries()) if(!p.locked) {
+        const along=i%3*4,away=4+Math.floor(i/3)*4;
+        state=movePiece(d,state,p.id,rotation?tray.minX-away:tray.minX+along,rotation?tray.minY+along:tray.minY-away);
+    }
+    const fitted=reframeCamera(d,state,c),points=cellsOnScreen(d,state,fitted);
+    const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);
+    expect(Math.min(...xs)).toBeGreaterThanOrEqual(28-1e-9);expect(Math.max(...xs)).toBeLessThanOrEqual(viewport.width-28+1e-9);
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(28-1e-9);expect(Math.max(...ys)).toBeLessThanOrEqual(viewport.height-28+1e-9);
+    // Tight on at least one axis.
+    expect(Math.min(Math.min(...xs)-28,viewport.width-28-Math.max(...xs),Math.min(...ys)-28,viewport.height-28-Math.max(...ys))).toBeLessThan(1e-6);
+    // Pieces above the tray push it below the middle of the view.
+    expect(trayCentre(d,fitted)[1]).toBeGreaterThan(viewport.height/2+10);
 });

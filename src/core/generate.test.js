@@ -95,19 +95,32 @@ describe('generatePuzzle', () => {
         expect(content.warnings).toEqual([]);
     });
 
-    it('stages pieces below the tray without touching it', () => {
+    it('stages pieces above and below the tray, centred on it, without touching it', () => {
         const { def } = generatePuzzle({ width: 6, height: 6, seed: 4 }, frozen);
-        const trayBottom = Math.max(...def.container.cells.map(([, y]) => y));
+        const ys = def.container.cells.map(([, y]) => y);
+        const xs = def.container.cells.map(([x]) => x);
+        const [top, bottom] = [Math.min(...ys), Math.max(...ys)];
+        const sides = { above: 0, below: 0 };
 
         for (const piece of def.pieces) {
-            expect(piece.start.y).toBeGreaterThan(trayBottom + 1);
+            const cells = placedCells(piece, piece.start);
+            const cellYs = cells.map(([, y]) => y);
+
+            if (Math.min(...cellYs) > bottom + 1) sides.below++;
+            else {
+                expect(Math.max(...cellYs)).toBeLessThan(top - 1);
+                sides.above++;
+            }
             expect(piece.start.rotation).toBe(0);
             expect(piece.start.flipped).toBe(false);
             expect(piece.locked).toBe(false);
         }
+        expect(sides.above).toBeGreaterThan(0);
+        expect(sides.below).toBeGreaterThan(0);
+        expect(Math.min(...xs) + Math.max(...xs) + 1).toBe(def.field.width);
     });
 
-    it('gives neighbouring pieces in the solution different colours', () => {
+    it('orders pieces so neighbours in the solution take different palette colours', () => {
         const { def, solution } = generatePuzzle({ width: 8, height: 8, seed: 5 }, frozen);
         const owner = new Map();
 
@@ -126,7 +139,7 @@ describe('generatePuzzle', () => {
             for (const [dx, dy] of [[1, 0], [0, 1]]) {
                 const other = owner.get(`${x + dx},${y + dy}`);
 
-                if (other && other !== piece) expect(other.color).not.toBe(piece.color);
+                if (other && other !== piece) expect(def.pieces.indexOf(other) % 6).not.toBe(def.pieces.indexOf(piece) % 6);
             }
         }
     });

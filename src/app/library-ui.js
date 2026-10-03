@@ -3,14 +3,22 @@ import { storage } from './storage.js';
 import { parseFile, inspectContent } from '../library/format.js';
 import { applyImport, applyRestore, allEntries, backupFile, collections, continuation, entries, packFile,
     previewImport, previewRestore, removeCollection, statusOf, validateBackup } from '../library/model.js';
-import { openGenerateSheet } from './generate-ui.js';
+import { newPuzzleSection } from './generate-ui.js';
+import { icon, iconButton } from '../ui/icons.js';
+import { silhouetteLoops } from '../ui/silhouette.js';
 
 export const element = (tag, value = '', className = '') => {
     const node = document.createElement(tag); node.textContent = value; node.className = className; return node;
 };
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const PAGE = 60;
+const STATUS_FILTERS = ['All', 'In progress', 'Unsolved', 'Solved'];
+const SORTS = [['authored', 'Collection order'], ['name', 'Name'], ['author', 'Creator']];
+
 export class LibraryUI {
     constructor(shell, repository) {
-        this.shell = shell; this.repo = repository; this.views = new Map(); this.packId = null;
+        this.shell = shell; this.repo = repository; this.page = null; this.scroll = new Map();
+        this.view = { query: '', filter: 'All', sort: 'authored', expanded: new Set(), searchExpanded: new Set(), limits: new Map() };
         this.importInput = this.fileInput(false); this.backupInput = this.fileInput(true);
     }
     get state() { return this.repo.state; }
@@ -39,148 +47,177 @@ export class LibraryUI {
         return input;
     }
     remember() {
-        if (this.shell.screen.hidden) return;
-        const view = this.views.get(this.packId || 'library');
-        if (view) { view.scroll = this.shell.screen.scrollTop; view.focus = document.activeElement?.dataset.entry || null; }
+        if (this.shell.screen.hidden || !this.page) return;
+        this.scroll.set(this.page, { top: this.shell.screen.scrollTop, focus: document.activeElement?.dataset.entry || null });
     }
-    browse(packId = null, push = true) {
-        this.remember(); this.shell.closeSheet(); this.shell.game.scene.stop('Play'); this.shell.def = null;
-        this.packId = packId; this.shell.context = null;
-        this.shell.url(null, push, packId);
-        this.shell.footer.hidden = true; this.shell.screen.hidden = false;
-        this.shell.screen.setAttribute('aria-label', packId ? 'Puzzle collection' : 'Puzzle library');
+    /** Shared entry to a library page: leave the player and show the page layer. */
+    show(page, label, params, push) {
+        this.remember(); this.shell.closeSheet(); this.shell.game.scene.stop('Play'); this.shell.def = null; this.shell.context = null;
+        this.shell.url(params, push);
+        this.shell.footer.hidden = true; this.shell.screen.hidden = false; this.shell.screen.setAttribute('aria-label', label);
         document.querySelector('#game').setAttribute('inert', '');
-        const pack = collections(this.state).find(p => p.id === packId);
-        if (packId && !pack) { this.browse(null, false); this.error(new Error('This pack is no longer installed.')); return; }
-        const viewKey = packId || 'library';
-        if (!this.views.has(viewKey)) this.views.set(viewKey, { query: '', filter: 'All', sort: 'authored', limit: 60, scroll: 0 });
-        const view = this.views.get(viewKey);
-        const main = element('div', '', 'library');
-        const top = element('header', '', 'library-top');
-        top.append(this.action(pack ? '← Library' : 'Pakke', () => this.browse(), 'text-button quiet'), this.action('Settings', () => this.settings(), 'text-button quiet'));
-        main.append(top, element('p', pack ? 'YOUR COLLECTION' : 'A LITTLE ROOM TO THINK', 'eyebrow'), element('h1', pack?.name || 'Your library'));
-        main.append(element('p', pack?.description || 'Pick a puzzle. Make yourself some room.', 'library-description'));
-        if (this.shell.storageNotice) main.append(element('p', this.shell.storageNotice, 'notice'));
-        if (pack) {
-            const count = entries(this.state, pack.id).filter(e => statusOf(this.state, e) === 'Solved').length;
-            main.append(element('p', `${pack.author || 'Personal collection'} · ${count} / ${pack.keys.length} solved`, 'collection-summary'));
-            const actions = element('div', '', 'library-actions');
-            actions.append(this.action('Pack details', () => this.packDetails(pack)));
-            if (pack.id !== 'loose') actions.append(this.action('Export pack', () => this.exportPack(pack.id)));
-            if (pack.source === 'imported' || pack.id === 'loose') actions.append(this.action(pack.id === 'loose' ? 'Remove generated puzzles' : 'Remove pack', () => this.remove(pack)));
-            main.append(actions);
-        } else {
-            const resume = continuation(this.state);
-            if (resume) {
-                const parent = collections(this.state).find(p => p.id === resume.packId);
-                const button = this.action('', () => this.play(resume), 'continue-card');
-                button.append(element('small', 'CONTINUE PLAYING'), element('strong', resume.def.meta?.name || resume.def.id), element('span', `${parent.name} →`)); main.append(button);
-            }
-            const actions = element('div', '', 'library-actions');
-            actions.append(this.action('Generate puzzle', () => openGenerateSheet(this.shell, this)), this.action('Import pack or puzzle', () => this.importInput.click()));
-            this.offlineLabel = element('span', this.shell.offlineStatus || 'Checking offline availability…', 'offline-status'); actions.append(this.offlineLabel); main.append(actions);
-        }
-        const controls = element('div', '', 'library-filters');
-        const label = element('label', '', 'search-label'); label.append(element('span', 'Search', 'sr-only'));
-        const search = document.createElement('input'); search.type = 'search'; search.placeholder = pack ? 'Search this pack' : 'Search puzzles, packs, creators…'; search.value = view.query; search.setAttribute('aria-label', 'Search library'); label.append(search);
-        const select = (name, values, value) => {
-            const control = document.createElement('select'); control.setAttribute('aria-label', name);
-            for (const [key, title] of values) { const option = element('option', title); option.value = key; control.append(option); }
-            control.value = value; return control;
-        };
-        const filter = select('Puzzle status', ['All', 'In progress', 'Unsolved', 'Solved'].map(v => [v, v]), view.filter);
-        const sort = select('Sort puzzles', [['authored', 'Collection order'], ['name', 'Name'], ['author', 'Creator']], view.sort);
-        controls.append(label, filter, sort); main.append(controls);
-        const result = element('div'); main.append(result);
-        const render = () => {
-            result.replaceChildren();
-            const query = view.query.trim().toLocaleLowerCase();
-            const matches = (...values) => values.filter(v => typeof v === 'string').join(' ').toLocaleLowerCase().includes(query);
-            const packs = collections(this.state);
-            if (!pack && view.filter === 'All') {
-                const matchingPacks = packs.filter(p => matches(p.name, p.author, p.catalogNumber));
-                if (matchingPacks.length) {
-                    result.append(element('h2', query ? 'Collections' : 'Find your next puzzle', 'section-title'));
-                    const grid = element('div', '', 'pack-grid');
-                    for (const p of matchingPacks.slice(0, view.limit)) grid.append(this.packCard(p));
-                    result.append(grid);
-                    if (matchingPacks.length > view.limit) result.append(this.action('Show more collections', () => { view.limit += 60; render(); }));
-                }
-                if (!query) return;
-            }
-            let list = pack ? entries(this.state, pack.id) : allEntries(this.state);
-            list = list.filter(e => matches(e.def.meta?.name, e.def.id, e.def.meta?.author, e.def.meta?.contributor, e.def.meta?.catalogNumber)
-                && (view.filter === 'All' || statusOf(this.state, e) === view.filter || view.filter === 'Unsolved' && statusOf(this.state, e) !== 'Solved'));
-            if (view.sort !== 'authored') list.sort((a, b) => String(a.def.meta?.[view.sort] || '').localeCompare(String(b.def.meta?.[view.sort] || '')));
-            const heading = element('h2', `${list.length} ${list.length === 1 ? 'puzzle' : 'puzzles'}`, 'section-title'); heading.setAttribute('aria-live', 'polite'); result.append(heading);
-            const grid = element('div', '', 'puzzle-grid');
-            for (const e of list.slice(0, view.limit)) grid.append(this.puzzleCard(e, !pack));
-            result.append(grid);
-            if (!list.length) result.append(element('p', 'No puzzles match. Try another search or status filter.', 'empty-state'));
-            if (list.length > view.limit) result.append(this.action('Show more puzzles', () => { view.limit += 60; render(); }));
-        };
-        search.addEventListener('input', () => { view.query = search.value; view.limit = 60; render(); });
-        filter.addEventListener('change', () => { view.filter = filter.value; view.limit = 60; render(); });
-        sort.addEventListener('change', () => { view.sort = sort.value; render(); });
-        this.shell.screen.replaceChildren(main); render();
+        this.page = page;
+    }
+    restore(main) {
+        this.shell.screen.replaceChildren(main);
+        const saved = this.scroll.get(this.page);
         requestAnimationFrame(() => {
-            if (view.focus) [...main.querySelectorAll('[data-entry]')].find(e => e.dataset.entry === view.focus)?.focus({ preventScroll: true });
-            this.shell.screen.scrollTop = view.scroll;
+            if (saved?.focus) [...main.querySelectorAll('[data-entry]')].find(e => e.dataset.entry === saved.focus)?.focus({ preventScroll: true });
+            this.shell.screen.scrollTop = saved?.top || 0;
+        });
+    }
+    refresh() { if (this.page === 'collections') this.collections(null, false); else this.home(false); }
+    section(label, ...children) {
+        const section = element('section', '', 'section'), heading = element('h2', label, 'section-label');
+        heading.id = `section-${label.toLowerCase().replace(/\W+/g, '-')}`; section.setAttribute('aria-labelledby', heading.id);
+        section.append(heading, ...children); return section;
+    }
+    row(title, meta, run) {
+        const button = this.action('', run, 'row');
+        button.append(element('span', title, 'row-title'), element('span', meta, 'meta')); button.insertAdjacentHTML('beforeend', icon('next'));
+        return button;
+    }
+
+    home(push = true) {
+        this.show('home', 'Home', {}, push);
+        const main = element('div', '', 'page home'), header = element('header', '', 'home-header');
+        header.append(element('h1', 'Pakke', 'wordmark'), iconButton('settings', 'Settings', () => this.settings()));
+        main.append(header);
+        if (this.shell.storageNotice) main.append(element('p', this.shell.storageNotice, 'notice'));
+        const resume = continuation(this.state);
+        if (resume) {
+            const pack = collections(this.state).find(p => p.id === resume.packId);
+            const row = this.row(resume.def.meta?.name || resume.def.id, pack?.name || '', () => this.play(resume));
+            row.dataset.continue = ''; main.append(this.section('Continue', row));
+        }
+        main.append(newPuzzleSection(this.shell, this));
+        const sets = collections(this.state).filter(p => p.id !== 'loose'), count = sets.reduce((n, p) => n + p.keys.length, 0);
+        main.append(this.section('Collections', this.row('Hand-made sets', `${plural(sets.length, 'set')} · ${plural(count, 'puzzle')}`, () => this.collections())));
+        this.restore(main);
+    }
+
+    collections(packId = null, push = true) {
+        const view = this.view;
+        if (packId) { view.expanded.add(packId); this.scroll.delete('collections'); }
+        this.show('collections', 'Collections', packId ? { view: 'collections', pack: packId } : { view: 'collections' }, push);
+        const main = element('div', '', 'page collections');
+        const back = this.action('Home', () => this.home(), 'back-link'); back.insertAdjacentHTML('afterbegin', icon('back'));
+        main.append(back, element('h1', 'Collections', 'page-title'));
+        const controls = element('div', '', 'search-row'), label = element('label', '', 'search');
+        label.insertAdjacentHTML('beforeend', icon('search')); label.append(element('span', 'Search collections', 'sr-only'));
+        const search = document.createElement('input'); search.type = 'search'; search.placeholder = 'Search'; search.value = view.query;
+        search.setAttribute('aria-label', 'Search collections'); label.append(search);
+        const filter = iconButton('filter', 'Filter and sort', () => this.filterSheet(() => { render(); mark(); }));
+        filter.classList.add('filter-button');
+        const mark = () => { const on = view.filter !== 'All' || view.sort !== 'authored'; filter.classList.toggle('is-active', on); filter.setAttribute('aria-pressed', String(on)); };
+        controls.append(label, filter); mark();
+        const tree = element('div', '', 'tree'), footer = element('div', '', 'page-footer');
+        const add = this.action('Import a collection', () => this.importInput.click(), 'link-button'); add.insertAdjacentHTML('afterbegin', icon('plus'));
+        footer.append(add); main.append(controls, tree, footer);
+        const render = () => this.renderTree(tree, render);
+        search.addEventListener('input', () => {
+            view.query = search.value; view.limits.clear(); view.searchExpanded = new Set(); render();
+        });
+        render(); this.restore(main);
+    }
+    renderTree(tree, render) {
+        const view = this.view, state = this.state, query = view.query.trim().toLocaleLowerCase();
+        const matches = (...values) => values.filter(v => typeof v === 'string').join(' ').toLocaleLowerCase().includes(query);
+        const filtering = !!query || view.filter !== 'All';
+        const packs = collections(state);
+        if (!packs.some(p => p.id === 'loose')) packs.push({ id: 'loose', name: 'Generated puzzles', keys: [], source: 'loose', placeholder: true });
+        tree.replaceChildren();
+        let shown = 0;
+        for (const pack of packs) {
+            const items = entries(state, pack.id), packMatch = !!query && matches(pack.name, pack.author, pack.catalogNumber);
+            let visible = items.filter(e => (!query || packMatch || matches(e.def.meta?.name, e.def.id, e.def.meta?.author, e.def.meta?.contributor, e.def.meta?.catalogNumber))
+                && (view.filter === 'All' || statusOf(state, e) === view.filter || view.filter === 'Unsolved' && statusOf(state, e) !== 'Solved'));
+            if (filtering && !visible.length && !(packMatch && view.filter === 'All')) continue;
+            if (view.sort !== 'authored') visible = [...visible].sort((a, b) => String(a.def.meta?.[view.sort] || '').localeCompare(String(b.def.meta?.[view.sort] || '')));
+            // While searching, matching groups open by default; toggles apply to the active set.
+            const openSet = query ? view.searchExpanded : view.expanded;
+            const open = query ? !openSet.has(pack.id) : openSet.has(pack.id);
+            const solved = items.filter(e => statusOf(state, e) === 'Solved').length;
+            const group = element('div', '', 'group'), head = element('div', '', 'group-head'), listId = `group-${shown}`;
+            const toggle = element('button', '', 'group-toggle'); toggle.type = 'button'; toggle.dataset.entry = `pack:${pack.id}`;
+            toggle.setAttribute('aria-expanded', String(open)); toggle.setAttribute('aria-controls', listId);
+            const chevron = element('span', '', 'chevron'); chevron.innerHTML = icon('next');
+            toggle.append(chevron, element('span', pack.name, 'group-name'), element('span', items.length ? `${solved} of ${items.length}` : '0', 'meta'));
+            toggle.addEventListener('click', () => { if (openSet.has(pack.id)) openSet.delete(pack.id); else openSet.add(pack.id); render(); });
+            head.append(toggle);
+            if (!pack.placeholder) head.append(iconButton('more', `${pack.name} actions`, () => this.packActions(pack)));
+            group.append(head);
+            if (open) {
+                const list = element('div', '', 'group-items'); list.id = listId;
+                const limit = view.limits.get(pack.id) || PAGE;
+                for (const record of visible.slice(0, limit)) list.append(this.puzzleRow(record));
+                if (!visible.length) list.append(element('p', 'None yet', 'empty'));
+                if (visible.length > limit) list.append(this.action('Show more', () => { view.limits.set(pack.id, limit + PAGE); render(); }, 'text-button quiet more-button'));
+                group.append(list);
+            }
+            tree.append(group); shown++;
+        }
+        if (!shown) tree.append(element('p', 'No matches', 'empty'));
+    }
+    puzzleRow(record) {
+        const status = statusOf(this.state, record);
+        const button = this.action('', () => this.play(record), 'puzzle-row'); button.dataset.entry = record.key + ':' + record.packId;
+        button.append(trayThumbnail(record.def, status), element('span', record.def.meta?.name || record.def.id, 'puzzle-name'));
+        if (status === 'Solved') { const s = element('span', 'Solved', 'status solved'); s.insertAdjacentHTML('afterbegin', icon('solved')); button.append(s); }
+        if (status === 'In progress') { const s = element('span', 'Started', 'status started'); s.insertAdjacentHTML('afterbegin', icon('started')); button.append(s); }
+        return button;
+    }
+    /** A puzzle choice inside a sheet, naming its collection. */
+    choiceRow(record) {
+        const button = this.action('', () => this.play(record), 'choice-row');
+        button.append(trayThumbnail(record.def, statusOf(this.state, record)), element('span', record.def.meta?.name || record.def.id, 'puzzle-name'),
+            element('span', collections(this.state).find(p => p.id === record.packId)?.name || '', 'meta'));
+        return button;
+    }
+    filterSheet(changed) {
+        const view = this.view;
+        this.shell.showSheet('Filter and sort', body => {
+            const select = (name, values, value, set) => {
+                const label = element('label', '', 'field'), control = document.createElement('select'); control.setAttribute('aria-label', name);
+                for (const [key, title] of values) { const option = element('option', title); option.value = key; control.append(option); }
+                control.value = value; control.addEventListener('change', () => { set(control.value); view.limits.clear(); changed(); });
+                label.append(element('span', name), control); return label;
+            };
+            body.append(select('Status', STATUS_FILTERS.map(v => [v, v]), view.filter, v => { view.filter = v; }),
+                select('Sort', SORTS, view.sort, v => { view.sort = v; }));
         });
     }
     play(record) { this.remember(); this.shell.open(record.def, true, record.packId, record.key); }
-    packCard(pack) {
-        const items = entries(this.state, pack.id), count = items.filter(e => statusOf(this.state, e) === 'Solved').length;
-        const button = this.action('', () => this.browse(pack.id), 'pack-card'); button.dataset.entry = pack.id;
-        const art = element('div', '', 'pack-art'); art.append(this.thumbnail(items[0]?.def));
-        const words = element('div', '', 'pack-words'); words.append(element('strong', pack.name), element('span', pack.author || 'Personal collection'), element('small', `${count} / ${items.length} solved`));
-        const meter = element('div', '', 'pack-meter'); const fill = element('i'); fill.style.width = `${items.length ? count / items.length * 100 : 0}%`; meter.append(fill);
-        button.append(art, words, meter); return button;
-    }
-    puzzleCard(record, showPack) {
-        const row = element('div', '', 'puzzle-row');
-        const button = this.action('', () => this.play(record), 'puzzle-card'); button.dataset.entry = record.key + ':' + record.packId;
-        const words = element('span'); words.append(element('strong', record.def.meta?.name || record.def.id));
-        if (showPack) words.append(element('small', collections(this.state).find(p => p.id === record.packId)?.name));
-        words.append(element('small', `${record.def.pieces.length} ${record.def.pieces.length === 1 ? 'piece' : 'pieces'} · ${statusOf(this.state, record)}`, 'card-status'));
-        button.append(this.thumbnail(record.def), words);
-        const info = this.action('···', () => this.puzzleDetails(record), 'puzzle-more'); info.setAttribute('aria-label', `Details for ${record.def.meta?.name || record.def.id}`);
-        row.append(button, info); return row;
-    }
-    thumbnail(def) {
-        const canvas = document.createElement('canvas'); canvas.className = 'thumbnail'; canvas.width = 240; canvas.height = 160; canvas.setAttribute('aria-hidden', 'true');
-        if (!def) return canvas;
-        const ctx = canvas.getContext('2d'), b = bounds(def.container.cells), size = Math.min(200 / b.width, 124 / b.height);
-        const ox = (240 - b.width * size) / 2, oy = (160 - b.height * size) / 2;
-        ctx.fillStyle = '#bacabb'; ctx.shadowColor = '#374b3b22'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 4;
-        for (const [x, y] of def.container.cells) ctx.fillRect(ox + (x - b.minX) * size, oy + (y - b.minY) * size, size - 1, size - 1);
-        return canvas;
-    }
     credits(body, meta = {}) {
         for (const [key, label] of [['author', 'Designer'], ['contributor', 'Contributor'], ['catalogNumber', 'Catalog number'], ['attribution', 'Attribution'], ['source', 'Source'], ['license', 'License']]) if (meta[key]) body.append(element('h3', label), element('p', meta[key]));
     }
-    packDetails(pack) {
+    packActions(pack) {
         this.shell.showSheet(pack.name, body => {
-            body.append(element('p', pack.description || 'A personal puzzle collection.'));
-            this.credits(body, pack); body.append(element('p', pack.source === 'bundled' ? 'Included with the game.' : pack.source === 'loose' ? 'Puzzles you generated or added individually.' : `Added from a file · Revision ${pack.revision}`));
+            const count = plural(pack.keys.length, 'puzzle');
+            body.append(element('p', [count, pack.source === 'bundled' ? 'Bundled' : pack.source === 'imported' ? `Revision ${pack.revision}` : null].filter(Boolean).join(' · '), 'secondary'));
+            if (pack.source !== 'loose' && pack.description) body.append(element('p', pack.description));
+            this.credits(body, pack);
+            const row = element('div', '', 'sheet-actions');
+            if (pack.id !== 'loose') row.append(this.action('Export pack', () => this.exportPack(pack.id)));
+            if (pack.source === 'imported' || pack.id === 'loose') row.append(this.action(pack.id === 'loose' ? 'Remove generated puzzles' : 'Remove pack', () => this.remove(pack)));
+            body.append(row);
         });
     }
-    puzzleDetails(record) {
-        this.shell.showSheet(record.def.meta?.name || record.def.id, body => {
-            body.append(element('p', record.def.meta?.description || 'Fit every piece inside the tray.')); this.credits(body, record.def.meta);
-            const alternatives = allEntries(this.state).filter(e => e.def.id === record.def.id && e.gameKey !== record.gameKey);
-            if (alternatives.length) body.append(element('p', 'Another gameplay revision is installed in a different collection. Each revision keeps its own progress.'));
-            const archived = Object.values(this.state.definitions).filter(e => e.def.id === record.def.id && e.gameKey !== record.gameKey && this.state.progress[e.gameKey]);
-            if (archived.length) body.append(element('p', `${new Set(archived.map(e => e.gameKey)).size} earlier gameplay revision(s) have retained progress. They are included in backups and restored if you reimport that content.`));
-            body.append(this.action('Export puzzle', () => this.download(record.def, `${record.def.id}.json`)));
-        });
+    /** Credits, revision notes and export for the open puzzle; shown in Help. */
+    puzzleInfo(body, record) {
+        this.credits(body, record.def.meta);
+        const alternatives = allEntries(this.state).filter(e => e.def.id === record.def.id && e.gameKey !== record.gameKey);
+        if (alternatives.length) body.append(element('p', 'Another gameplay revision is installed in a different collection. Each revision keeps its own progress.', 'secondary'));
+        const archived = Object.values(this.state.definitions).filter(e => e.def.id === record.def.id && e.gameKey !== record.gameKey && this.state.progress[e.gameKey]);
+        if (archived.length) body.append(element('p', `${new Set(archived.map(e => e.gameKey)).size} earlier gameplay revision(s) have retained progress. They are included in backups and restored if you reimport that content.`, 'secondary'));
+        body.append(this.action('Export puzzle', () => this.download(record.def, `${record.def.id}.json`)));
     }
     async importPreview(data) {
         await this.repo.flush();
         const content = await inspectContent(data), plan = previewImport(this.state, content);
         const title = content.standalone ? content.records[0].def.meta?.name || content.records[0].def.id : content.file.pack.name;
         this.shell.showSheet(plan.kind === 'identical' ? 'Already installed' : plan.kind === 'update' ? 'Update preview' : 'Add to your library', body => {
-            body.append(element('h3', title), element('p', content.standalone ? 'An individual puzzle, added to Generated puzzles.' : `${content.file.pack.author || 'Personal collection'} · ${content.records.length} puzzles · Revision ${content.file.pack.revision}`));
+            body.append(element('h3', title), element('p', content.standalone ? 'Single puzzle · Generated puzzles' : `${content.file.pack.author || 'No creator'} · ${plural(content.records.length, 'puzzle')} · Revision ${content.file.pack.revision}`));
             if (content.file.pack?.description) body.append(element('p', content.file.pack.description));
             if (plan.kind === 'update') body.append(element('p', `${plan.added.length} added · ${plan.removed.length} removed · ${plan.changed.length} changed. ${plan.fresh.length} gameplay revision(s) start fresh. Earlier progress is retained; metadata-only changes keep current progress.`));
             if (plan.kind === 'update') {
@@ -195,28 +232,37 @@ export class LibraryUI {
             if (content.warnings.length) {
                 const details = element('details'); details.append(element('summary', `${content.warnings.length} authoring warnings`), element('p', content.warnings.slice(0, 20).join('\n'), 'file-message')); body.append(details);
             }
-            body.append(element('p', 'The file has been checked for supported puzzle data. Solvability has not been verified.'));
+            body.append(element('p', 'Checked for supported puzzle data. Solvability is not verified.', 'secondary'));
             let confirm;
             if (plan.conflictingRevision) {
                 body.append(element('p', `Installed revision: ${plan.previousRevision}. This file declares the same or an older revision with different content.`));
                 const label = element('label', '', 'preference'); confirm = document.createElement('input'); confirm.type = 'checkbox'; label.append(confirm, document.createTextNode('Replace this pack with the selected file')); body.append(label);
             }
             const packId = content.standalone ? 'loose' : content.file.pack.id;
-            if (plan.kind === 'identical') body.append(this.action('Open pack', () => this.browse(packId)));
+            const row = element('div', '', 'sheet-actions');
+            if (plan.kind === 'identical') row.append(this.action('Open collection', () => this.collections(packId)));
             else {
                 const add = this.action(plan.kind === 'update' ? 'Update pack' : content.standalone ? 'Add puzzle' : 'Add pack', async () => {
                     await this.repo.mutate(s => applyImport(s, plan, confirm?.checked));
-                    this.shell.showSheet('Saved to your library', result => { result.append(element('p', title), this.action('Open pack', () => this.browse(packId))); });
+                    if (this.page === 'collections' && !this.shell.screen.hidden) this.collections(null, false);
+                    this.shell.showSheet('Saved to your library', result => {
+                        const actions = element('div', '', 'sheet-actions');
+                        actions.append(this.action('Open collection', () => this.collections(packId), 'text-button primary'));
+                        result.append(element('p', title), actions);
+                    });
                 }, 'text-button primary');
                 if (confirm) { add.disabled = true; confirm.addEventListener('change', () => { add.disabled = !confirm.checked; }); }
-                body.append(add);
+                row.append(add);
             }
+            body.append(row);
         });
     }
     remove(pack) {
         this.shell.showSheet(`Remove ${pack.name}?`, body => {
-            body.append(element('p', 'This removes the collection from your library. Attempts and solved history are kept and will return if you import the same puzzles again. Other collections and drafts are kept.'));
-            body.append(this.action('Remove from library', async () => { await this.repo.mutate(s => removeCollection(s, pack.id)); this.browse(); }, 'text-button danger'));
+            body.append(element('p', 'Attempts and solved history are kept and return if you import the same puzzles again.'));
+            const row = element('div', '', 'sheet-actions');
+            row.append(this.action('Remove from library', async () => { await this.repo.mutate(s => removeCollection(s, pack.id)); this.collections(null, false); }, 'text-button primary'));
+            body.append(row);
         });
     }
     async exportPack(id) { await this.repo.flush(); await this.download(packFile(this.state, id), `${id}.json`); }
@@ -231,8 +277,8 @@ export class LibraryUI {
     async restorePreview(data) {
         await this.repo.flush(); const incoming = await validateBackup(data), plan = previewRestore(this.state, incoming);
         this.shell.showSheet('Restore backup', body => {
-            body.append(element('p', `${Object.keys(incoming.packs).length} collections · ${Object.keys(incoming.definitions).length} puzzle definitions · ${Object.keys(incoming.progress).length} saved attempts.`));
-            body.append(element('p', `${plan.packConflicts.length} pack, ${plan.looseConflicts.length} standalone puzzle, ${plan.progressConflicts.length} attempt, and ${plan.draftConflicts.length} draft conflicts. Existing content and attempts are kept by default. Solved histories are combined for matching gameplay revisions. Bundled collections stay as shipped.`));
+            body.append(element('p', `${plural(Object.keys(incoming.packs).length, 'collection')} · ${plural(Object.keys(incoming.definitions).length, 'puzzle definition')} · ${plural(Object.keys(incoming.progress).length, 'saved attempt')}`));
+            body.append(element('p', `${plan.packConflicts.length} pack, ${plan.looseConflicts.length} standalone puzzle, ${plan.progressConflicts.length} attempt, and ${plan.draftConflicts.length} draft conflicts. Existing content and attempts are kept by default. Solved histories are combined for matching gameplay revisions. Bundled collections stay as shipped.`, 'secondary'));
             if (plan.packConflicts.length || plan.progressConflicts.length) {
                 const details = element('details'); details.append(element('summary', 'Review conflicting content'));
                 for (const id of plan.packConflicts) details.append(element('p', `${incoming.packs[id].envelope.pack.name}: local revision ${this.state.packs[id].envelope.pack.revision}, backup revision ${incoming.packs[id].envelope.pack.revision}.`));
@@ -243,10 +289,12 @@ export class LibraryUI {
                 body.append(details);
             }
             const label = element('label', '', 'preference'); const replace = document.createElement('input'); replace.type = 'checkbox'; label.append(replace, document.createTextNode('Replace conflicting local content, attempts, drafts, and settings with this backup, even if local work is newer')); body.append(label);
-            body.append(this.action('Restore into library', async () => {
-                await this.repo.mutate(s => applyRestore(s, plan, replace.checked)); this.syncPreferences(); this.browse();
-                this.shell.showSheet('Backup restored', result => result.append(element('p', 'Your restored puzzles and progress are available in the library.')));
+            const row = element('div', '', 'sheet-actions');
+            row.append(this.action('Restore into library', async () => {
+                await this.repo.mutate(s => applyRestore(s, plan, replace.checked)); this.syncPreferences(); this.home(false);
+                this.shell.showSheet('Backup restored', () => {});
             }, 'text-button primary'));
+            body.append(row);
         });
     }
     syncPreferences() { for (const key of ['reduced-motion', 'help-seen']) storage.write(key, this.state.preferences[key] === true); }
@@ -255,20 +303,35 @@ export class LibraryUI {
     }
     settings() {
         this.shell.showSheet('Settings', body => {
-            body.append(element('p', 'Your library and progress belong to this browser on this device. Use a backup to move them or keep an extra copy.'));
             const label = element('label', '', 'preference'), checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = this.state.preferences['reduced-motion'] === true;
             checkbox.addEventListener('change', async () => { try { await this.preference('reduced-motion', checkbox.checked); } catch (e) { checkbox.checked = !checkbox.checked; this.error(e); } });
             label.append(checkbox, document.createTextNode('Reduce motion')); body.append(label);
-            body.append(this.action('Back up library', async () => { await this.repo.flush(); await this.download(backupFile(this.state), 'packing-library-backup.json'); }),
+            body.append(element('h3', 'Library'));
+            const row = element('div', '', 'sheet-actions');
+            row.append(this.action('Back up library', async () => { await this.repo.flush(); await this.download(backupFile(this.state), 'packing-library-backup.json'); }),
                 this.action('Restore backup', () => this.backupInput.click()), this.action('Erase all saved progress', () => {
                     this.shell.showSheet('Erase all saved progress?', content => {
-                        content.append(element('p', 'Erase all attempts and solved history, including progress retained for removed packs and earlier revisions. Installed puzzles, settings, and drafts are kept.'));
-                        content.append(this.action('Erase progress', async () => {
-                            await this.repo.mutate(s => ({ ...structuredClone(s), progress: {} })); this.browse();
-                        }, 'text-button danger'));
+                        content.append(element('p', 'Erases all attempts and solved history, including progress retained for removed packs and earlier revisions. Installed puzzles, settings, and drafts are kept.'));
+                        const actions = element('div', '', 'sheet-actions');
+                        actions.append(this.action('Erase progress', async () => {
+                            await this.repo.mutate(s => ({ ...structuredClone(s), progress: {} })); this.refresh();
+                        }, 'text-button primary'));
+                        content.append(actions);
                     });
                 }));
-            body.append(element('p', this.shell.offlineStatus || 'Checking offline availability…'));
+            body.append(row);
         });
     }
+}
+
+/** A 26 px outline of the puzzle's real tray, filled by its status. */
+export function trayThumbnail(def, status) {
+    const ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg'), path = document.createElementNS(ns, 'path');
+    const cells = def.container.cells, b = bounds(cells), m = Math.max(b.width, b.height);
+    const dx = (m - b.width) / 2 - b.minX, dy = (m - b.height) / 2 - b.minY;
+    path.setAttribute('d', silhouetteLoops(cells).map(loop => 'M' + loop.map(([x, y]) => `${x + dx} ${y + dy}`).join('L') + 'Z').join(''));
+    path.setAttribute('fill-rule', 'evenodd'); path.setAttribute('stroke-width', String(0.035 * m + 0.05));
+    svg.setAttribute('viewBox', `-0.3 -0.3 ${m + 0.6} ${m + 0.6}`); svg.setAttribute('aria-hidden', 'true');
+    svg.classList.add('tray-thumb', status === 'Solved' ? 'solved' : status === 'In progress' ? 'started' : 'new');
+    svg.append(path); return svg;
 }
