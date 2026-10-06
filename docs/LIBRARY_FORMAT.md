@@ -1,6 +1,6 @@
 # Library formats and persistence
 
-Current implementation reference, reviewed September 9, 2026. Product behavior
+Current implementation reference, reviewed October 5, 2026. Product behavior
 is in [DESIGN.md](../DESIGN.md); this document records contracts that future
 content tools and an optional editor must preserve.
 
@@ -57,6 +57,25 @@ can belong to multiple packs, with each pack retaining its exact definition.
   exchange format is not defined yet.
 - Personal backups are routed to Restore backup rather than content import.
 
+### Optional schema-1 board and piece fields
+
+`container.cells` remains the authoritative list of playable squares.
+`container.holes` optionally lists visible non-playable squares, disjoint from
+`cells`. `container.labels` optionally lists `{cell: [x, y], text: "Jan"}` for
+squares in either list. Empty/missing lists preserve the original behavior.
+Labels must be unique by coordinate, nonblank strings of at most 80 characters;
+holes use the same bounded coordinate/field validation as playable cells.
+
+Pieces may optionally declare `flippedColor`, a 3- or 6-digit hex color. Omission
+uses the same color on both faces, including the theme palette fallback.
+Colors are selected by the saved face flag, even on symmetric shapes.
+
+Supported `requiredFeatures` names are `board-labels`, `visible-holes`, and
+`flipped-color`. Declare features when essential to understanding the puzzle;
+daily definitions declare the first two. Previous apps reject these declarations
+explicitly. Unknown required features remain errors. Schema, pack, backup, and
+database versions remain 1; existing definition and progress keys are unchanged.
+
 ## Identity and updates
 
 Definitions have two SHA-256 identifiers, computed independently of object-key
@@ -65,10 +84,13 @@ insertion order:
 | Identifier | Includes | Purpose |
 | --- | --- | --- |
 | Content key | Complete definition, including presentation and metadata | Pins exactly what a collection contains. |
-| Gameplay key | Puzzle ID, schema/type, field bounds, tray cells, rules, piece IDs/shapes, starts, and locks | Keys attempts and solved history. |
+| Gameplay key | Puzzle ID, schema/type, field bounds, tray cells, rules, piece IDs/shapes, starts, locks, and nonempty visible-hole coordinates | Keys attempts and solved history. |
 
 Coordinate-list order and piece-list order are normalized for gameplay identity.
-Metadata, colors, and presentation do not change that identity. Field bounds do:
+Metadata, labels, colors (including flippedColor), and presentation do not
+change that identity. Nonempty visible-hole coordinates are included because
+they affect board framing and the runtime workspace; absent/empty holes add
+nothing to the old gameplay projection. Field bounds do:
 changing them can change the set of valid saved placements. Stored shape/start
 changes produce a new gameplay key even if an author considers them equivalent.
 The player uses a free piece's start for its rotation and flip only; it lays out
@@ -132,7 +154,19 @@ standalone versions, attempts, drafts, and preferences. Explicit replacement can
 choose backup versions even when local data is newer. Solved histories combine
 for matching gameplay keys. Bundled collections remain those shipped by the app.
 
-Known settings are `reduced-motion` and `help-seen`. The current snapshot and
+Known boolean settings are `reduced-motion`, `help-seen`, `daily-allow-flip`,
+and `generator-allow-flip`. Missing flip settings default to false for daily
+play and true for generation. Optional `theme` is `"system"`, `"light"`, or
+`"dark"`; missing defaults to System. It is backed up and restored with other
+preferences. IndexedDB is authoritative; a localStorage mirror applies the
+choice before the player boots. Existing backups without `theme` remain valid.
+
+Daily puzzles have no pack or loose membership. Their deterministic definitions
+are retained on demand in `definitions`, and attempts use `progress` with
+context `daily`. They are included in backups and progress clearing. The daily
+calendar and Continue read these records directly; Collections ignores them.
+Supporting 2026 requires at most 730 daily definitions. No separate database
+migration or additional store is needed. The current snapshot and
 backup versions are separate from puzzle schema and pack format versions.
 Unknown versions are refused; future migrations should be explicit data
 transformations, not silent repairs.

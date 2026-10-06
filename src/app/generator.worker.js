@@ -1,4 +1,4 @@
-// Runs the puzzle generator off the main thread. Imports only from core, so
+// Runs the puzzle generator off the main thread. Imports core and pure palette data, so
 // the worker bundle stays small and never touches Phaser or the DOM.
 import { generatePuzzle } from '../core/generate.js';
 

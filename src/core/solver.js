@@ -220,7 +220,12 @@ export function countSolutions(regionOrCells, shapes, rules = {}, options = {}) 
 
     const table = buildPlacements(region, shapes);
     const { words, cellLists, shapeOf, masks } = table;
-    const drops = options.breakSymmetry === false ? new Set() : symmetryBreakingDrops(region, shapes, table);
+    // Placement pruning needs transformations that preserve every allowed shape.
+    // Counting may still merge two legal solutions related by a board reflection,
+    // but pruning against an illegal mirrored placement can remove every solution.
+    const pruningRegion = { ...region, symmetries: region.symmetries.filter(sym =>
+        (rules.allowRotation !== false || sym.rotation === 0) && (rules.allowFlip === true || !sym.flipped)) };
+    const drops = options.breakSymmetry === false ? new Set() : symmetryBreakingDrops(pruningRegion, shapes, table);
     const anchored = table.anchored.map((list) => Int32Array.from(list.filter((p) => !drops.has(p))));
     const sizeOf = Int32Array.from(cellLists, (list) => list.length);
     const n = region.n;
@@ -406,5 +411,8 @@ export function analyseDef(def, options = {}) {
     const cells = def.container.cells.filter(([x, y]) => !lockedCells.has(cellKey(x, y)));
     const shapes = shapeMultiset(def.pieces.filter((piece) => !piece.locked), def.rules);
 
-    return countSolutions(createRegion(cells), shapes, def.rules, options);
+    const region = createRegion(cells);
+    // Labeled board squares have fixed meaning; count on that fixed board.
+    if (def.container.labels?.length) region.symmetries = region.symmetries.filter(s => s.rotation === 0 && !s.flipped);
+    return countSolutions(region, shapes, def.rules, options);
 }

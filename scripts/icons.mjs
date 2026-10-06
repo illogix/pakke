@@ -2,13 +2,14 @@
 // that complete its 3×3 square, in the Latte or Mocha Blue and Yellow.
 // PLAYWRIGHT_MODULE and CHROME_PATH work as in the browser checks.
 import { writeFile } from 'node:fs/promises';
+import { schemes as palettes, tintedIcon } from '../src/themes/palettes.js';
+import { cssColor } from '../src/ui/theme.js';
 
 const CELL = 6, ORIGIN = 7, RADIUS = 0.6;
+const iconColors = palette => ({ page: cssColor(palette.page), blue: cssColor(palette.calendarBlue), yellow: cssColor(palette.calendarYellow) });
 const schemes = {
-    light: { page: '#eff1f5', blue: '#1e66f5', yellow: '#df8e1d' },
-    dark: { page: '#1e1e2e', blue: '#89b4fa', yellow: '#f9e2af' },
-    // iOS tints by luminance; the two pieces keep distinct brightness.
-    tinted: { page: '#000000', blue: '#ffffff', yellow: '#999999' }
+    light: iconColors(palettes.light), dark: iconColors(palettes.dark),
+    tinted: Object.fromEntries(Object.entries(tintedIcon).map(([key, value]) => [key, cssColor(value)]))
 };
 
 // Clockwise outlines in 32-unit icon space. The pieces share their seam: any gap

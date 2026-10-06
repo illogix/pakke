@@ -124,6 +124,18 @@ describe('countSolutions', () => {
         expect(countSolutions(rect(2, 1), shapeMultiset([standing], { allowRotation: true, allowFlip: false }), FREE).orbits).toBe(1);
     });
 
+    it('keeps a chiral rotations-only carving when reflection would produce an illegal face', () => {
+        const rules = {allowRotation: true, allowFlip: false};
+        const pieces = [
+            [[0,0],[0,1],[0,2],[0,3],[1,1]],
+            [[1,0],[2,0],[2,1],[3,1],[2,2],[3,0]],
+            [[1,2],[1,3],[2,3],[3,3],[3,2]]
+        ];
+        const shapes = shapeMultiset(pieces, rules);
+        expect(countSolutions(rect(4,4), shapes, rules, {cap:10})).toMatchObject({orbits:1, exhausted:true});
+        expect(countSolutions(rect(4,4), shapes, rules, {cap:10, breakSymmetry:false})).toMatchObject({orbits:1, exhausted:true});
+    });
+
     it('stops at the cap without claiming exhaustion', () => {
         const result = countSolutions(rect(4, 2), shapeMultiset([domino, domino, domino, domino], FREE), FREE, { cap: 2 });
 
@@ -178,6 +190,12 @@ describe('analyseDef', () => {
             expect(result.orbits, id).toBeGreaterThan(0);
             expect(result.exhausted, id).toBe(true);
         }
+    });
+
+    it('counts labeled board solutions without quotienting board rotations or reflections', () => {
+        const def = {container:{cells:rect(2,2), labels:[{cell:[0,0],text:'Jan'}]}, rules:FREE,
+            pieces:[{id:'a',cells:domino,locked:false},{id:'b',cells:domino,locked:false}]};
+        expect(analyseDef(def, {cap:10})).toMatchObject({orbits:2,exhausted:true});
     });
 
     it('treats a locked piece as fixed and removes its cells from the tray', () => {

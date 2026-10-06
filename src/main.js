@@ -1,9 +1,13 @@
 import Phaser from 'phaser';
 import PlayScene from './scenes/PlayScene.js';
 import { Shell } from './app/shell.js';
-import { theme } from './ui/theme.js';
+import { setThemePreference, theme } from './ui/theme.js';
+import { storage } from './app/storage.js';
 import './style.css';
 
+// Apply the preference mirror before Phaser boots; the library later supplies
+// its authoritative value (including after a backup restore).
+setThemePreference(storage.read('theme'));
 const shell = new Shell();
 const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
 const host = document.querySelector('#game');

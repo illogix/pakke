@@ -3,7 +3,7 @@ import { inspectContent, LIMITS } from './format.js';
 
 export function checkCapacity(state) {
     const definitions=Object.values(state.definitions);
-    const cells=definitions.reduce((total,r)=>total+r.def.container.cells.length+r.def.pieces.reduce((sum,p)=>sum+p.cells.length,0),0);
+    const cells=definitions.reduce((total,r)=>total+r.def.container.cells.length+(r.def.container.holes?.length ?? 0)+r.def.pieces.reduce((sum,p)=>sum+p.cells.length,0),0);
     if(definitions.length>LIMITS.definitions||cells>LIMITS.cells||new TextEncoder().encode(JSON.stringify(state)).length>LIMITS.backupBytes-1024) {
         throw new Error('This library would exceed its backup capacity (2,000 retained definitions, 500,000 cells, or 50 MiB). The change was not saved.');
     }

@@ -1,6 +1,6 @@
 // One continuous coordinate transform for rendering, grid lines and input.
 import { workspaceBounds } from '../core/workspace.js';
-import { placedCells } from '../core/puzzle.js';
+import { boardCells, placedCells } from '../core/puzzle.js';
 import { arrangePieces } from '../core/arrange.js';
 
 export function displayPoint(field, rotation, x, y) {
@@ -30,7 +30,7 @@ const fit = (viewport, box, pad = 20) => Math.max(0.01, Math.min(
     Math.max(1, viewport.height - pad * 2) / (box.maxY - box.minY)));
 /** The tray's display box. */
 function trayBox(def) {
-    const xs = def.container.cells.map(c => c[0]), ys = def.container.cells.map(c => c[1]);
+    const xs = boardCells(def).map(c => c[0]), ys = boardCells(def).map(c => c[1]);
     return displayBox(def, { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs) + 1, maxY: Math.max(...ys) + 1 });
 }
 /** The smallest box centred on the tray that still contains `box`. */
@@ -42,7 +42,7 @@ function aroundTray(def, box) {
 }
 /** Display box of the tray and every piece. */
 function contentBox(def, state) {
-    const cells = [...def.container.cells, ...def.pieces.flatMap(p => placedCells(p, state.placements[p.id]))];
+    const cells = [...boardCells(def), ...def.pieces.flatMap(p => placedCells(p, state.placements[p.id]))];
     const points = cells.map(([x,y]) => displayCell(def,x,y));
     return { minX: Math.min(...points.map(p=>p[0])), minY: Math.min(...points.map(p=>p[1])), maxX: Math.max(...points.map(p=>p[0]))+1, maxY: Math.max(...points.map(p=>p[1]))+1 };
 }

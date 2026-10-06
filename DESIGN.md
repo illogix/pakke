@@ -1,6 +1,6 @@
 # Pakke — current design
 
-Current as of October 2, 2026. This is the authoritative product and gameplay
+Current as of October 6, 2026. This is the authoritative product and gameplay
 reference. It describes the implemented player and library. See
 [the library format reference](docs/LIBRARY_FORMAT.md) for exchange and storage
 contracts, and [verification](docs/VERIFICATION.md) for checks and their limits.
@@ -25,6 +25,8 @@ Five bundled puzzles are arranged in two explicit collections:
   piece and intentional spare room.
 - **Room to think:** `pent01`, the larger pentomino challenge.
 
+A separate **Daily Calendar Puzzles** mode offers every date in 2026 with and without flipping; it does not appear in Collections.
+
 The library can also **generate** new puzzles on the device; see
 [Generated puzzles](#generated-puzzles). The editor is a possible future
 feature, not a prerequisite or an implemented screen. Native mobile packaging
@@ -40,6 +42,7 @@ the source of truth for piece placements or rules.
 | `src/core/` | Pure geometry, committed state operations, violations, completion, validation, and the solver/generator. No Phaser imports. |
 | `src/puzzles/` | Bundled JSON definitions and an explicitly ordered pack manifest. |
 | `src/library/` | Definition identity, file validation, collections, saved attempts, backups, and the IndexedDB repository. No Phaser imports. |
+| `src/themes/` | Shared pure theme palettes, including variable-length piece color arrays. |
 | `src/ui/` | Camera and gesture math, colour-scheme tokens, procedural materials, silhouettes, and icons. Some rendering helpers use browser canvas/DOM APIs. |
 | `src/scenes/` | Phaser drawing, event wiring, transient selection and gesture previews. |
 | `src/app/` | Home and Collections pages, player controls/dialogs, routing, offline registration, legacy storage migration, and the generator controls with their Web Worker. |
@@ -98,15 +101,32 @@ Never rename an ID merely to reorder a collection. Designer, contributor,
 source, attribution, license, tags, and catalog numbers belong in metadata;
 optional credits are not a prerequisite for a private puzzle.
 
-The tray is a set of cells, allowing holes and nonrectangular shapes without
-special cell roles. `type` and `completion` are machine identifiers; common
+The tray is a set of playable `container.cells`, allowing holes and
+nonrectangular shapes. Two optional fields extend the visible board:
+
+- `container.holes`: coordinate pairs for visible, non-playable board squares.
+  They must be disjoint from playable cells. Missing or empty means no visible holes.
+- `container.labels`: `{cell: [x, y], text: "Jan"}` entries referencing either a
+  playable cell or a visible hole. One label per square, nonblank text up to 80
+  characters. Missing or empty means no labels.
+
+Squares in neither list are outside the board. Labels sit beneath pieces and
+stay upright under presentation rotation. Visible holes use a subdued inset
+and bold label. Both lists move with the tray when staging or framing it.
+Calendar content declares `requiredFeatures: ["board-labels", "visible-holes"]`
+so older apps reject it instead of hiding essential annotations. `type` and `completion` are machine identifiers; common
 instructions and human-readable rule labels live in code. Puzzle-specific
 notes use `meta.description`.
 
 `color` is optional. A piece without one takes the theme's piece palette in
-definition order, counting only uncoloured pieces: colours 1–6, then cycling
-back to 1. Palette colours follow the colour scheme; an authored hex colour is
-used as given in every scheme. Bundled and generated puzzles leave colour unset.
+definition order, counting only uncoloured pieces and cycling through every
+color in the active palette. Palette length is unrestricted (and nonzero): a
+four-color theme gives eight uncoloured pieces two of each color. Palette colours follow the colour scheme; an authored hex colour is
+used as given in every scheme. Optional `flippedColor` uses the same hex format
+and appears whenever the placement's `flipped` flag is true. If omitted, the
+reverse face uses the normal authored or theme-assigned color. A reverse-only
+color does not consume another palette slot. Bundled, generated, and daily
+puzzles leave both colors unset.
 
 Preserve `flipped` even for symmetric pieces. Equivalent geometry does not
 justify discarding face identity; a future two-faced-piece rule could use it.
@@ -241,17 +261,19 @@ transformed, or dragged, and cannot expose a piece underneath to selection.
 
 The light scheme is Catppuccin Latte and the dark scheme Catppuccin Mocha; more
 themes may follow. Surfaces are flat, with no textures, gradients, or themed
-decoration. The theme follows `prefers-color-scheme` live, including an open
-board, and the browser `theme-color` follows it too. There is no accent colour:
+decoration. Settings offers **System / Light / Dark**, defaulting to System.
+System follows `prefers-color-scheme` live, including an open board; fixed
+choices ignore OS changes. The choice is saved with the library and included
+in backups. Browser `theme-color` follows the applied palette too. There is no accent colour:
 solved marks and the primary button use the text colour.
 
 | Element | Catppuccin role | Latte | Mocha |
 | --- | --- | --- | --- |
 | Page background, piece separation edge | Base | `#eff1f5` | `#1e1e2e` |
-| Panels (rows, steppers, search, dock, menu rows) | Mantle | `#e6e9ef` | `#181825` |
-| Tray, hover | Surface0 | `#ccd0da` | `#313244` |
-| Hairlines, guide lines, pressed | Surface1 | `#bcc0cc` | `#45475a` |
-| Board dots and tray lines | Surface1 at 50% | `#bcc0cc` | `#45475a` |
+| Panels (rows, steppers, search, dock, menu rows) | Surface0 | `#ccd0da` | `#313244` |
+| Tray, hover | Surface1 | `#bcc0cc` | `#45475a` |
+| Hairlines, guide lines, pressed, selected toggles | Surface2 | `#acb0be` | `#585b70` |
+| Board dots and tray lines | Surface2 at 50% | `#acb0be` | `#585b70` |
 | Text, icons | Text | `#4c4f69` | `#cdd6f4` |
 | Secondary text | Subtext0 | `#6c6f85` | `#a6adc8` |
 | Started thumbnails | Overlay0 | `#9ca0b0` | `#6c7086` |
@@ -259,9 +281,19 @@ solved marks and the primary button use the text colour.
 The piece palette is the style guide's regular terminal colours 1–6: Red,
 Green, Yellow, Blue, Pink, Teal (Latte `#d20f39 #40a02b #df8e1d #1e66f5
 #ea76cb #179299`; Mocha `#f38ba8 #a6e3a1 #f9e2af #89b4fa #f5c2e7 #94e2d5`).
-CSS custom properties in `style.css` hold the UI tokens; `src/ui/theme.js`
-mirrors the board colours and holds the palette because Phaser cannot read CSS
-variables. Panels and buttons use a 14 px radius, the search field 12 px, and
+`src/themes/palettes.js` is the single source for theme color values, including
+UI, board, piece palettes, translucent material colors, calendar indicators,
+and icon generation. `src/ui/theme.js` maps those semantic tokens to CSS custom
+properties and supplies the same values to canvas/Phaser. The Vite theme plugin
+inserts generated light/dark tokens and browser theme colors into HTML before
+JavaScript boots; applying a palette then updates CSS, browser chrome, and open
+board textures together. More named palettes can use the same tokens.
+Selected segmented controls use Surface2 over their Surface0 group: lighter
+in Mocha, darker in Latte, while remaining subdued beside primary buttons. Piece palettes are nonempty arrays of any length.
+The generator receives the active palette length for its neighbor-color ordering.
+The calendar icon button uses the same primary background and ink as Today’s
+puzzle. Board labels use full ink for readability on the stronger tray surface.
+Panels and buttons use a 14 px radius, the search field 12 px, and
 the dock 20 px. Touch targets are at least 44 px; the generator's
 stepper buttons are the exception at 40 px wide by 56 px tall, and the two
 steppers stack below 390 px wide so their labels never truncate.
@@ -286,7 +318,7 @@ functional phrase ("None yet").
 ## Library experience and persistence
 
 **Home** shows the Pakke wordmark with a Settings button, a **Continue** row
-when an unfinished saved attempt is available, the **New puzzle** controls (see
+when an unfinished saved attempt is available, the **Daily puzzle** controls, the **New puzzle** controls (see
 [Generated puzzles](#generated-puzzles)), and one **Hand-made sets** row
 ("2 sets · 5 puzzles", excluding Generated puzzles) leading to Collections.
 
@@ -331,13 +363,54 @@ separate confirmed action. Backups include content and personal data; content
 exports do not. Restore keeps local conflicts unless replacement is selected.
 See [the format reference](docs/LIBRARY_FORMAT.md) for precise version rules.
 
+## Daily calendar puzzles
+
+Daily play is a separate mode, available for 2026 (365 dates). Home has a small
+**No flips / Flips allowed** segmented control above a wide **Today’s puzzle**
+button and a square calendar-icon button. Today uses the device's local date;
+its button is disabled outside the supported year. The mode defaults to No
+flips, is remembered in library preferences, and is shared with the calendar.
+
+**Daily Calendar Puzzles** shows the current month, previous/next arrows, a
+native month dropdown, and the read-only year 2026. Arrows stop at January and
+December. Dates open immediately using the selected mode; there is no mode
+modal. The same segmented control above the grid is the progress legend:
+blue on the left is No flips, yellow on the right is Flips allowed. A first
+committed move creates an outline dot; solved history creates a filled dot.
+Unattempted dates reserve empty dot positions. Today has a separate ring around
+its number. Accessible date labels include both statuses and the opening mode.
+The grid has seven columns, uses ordinary scrolling on short screens, and keeps
+44 px targets at 320 px width. Progress is separate for each date and mode.
+
+The board uses the B faces of the selected tradeoff-290 inventory, embedded
+in `src/daily/calendar-pieces.json`: all five
+free tetrominoes and F/N/U/Y/Z pentominoes, 45 piece cells. The tray has 47 visible
+squares in a 7×7 bounding box, excluding the two upper-right corners. Each date
+removes its month and day from playable cells and retains them as labeled holes.
+The four blank bottom squares are playable. Both modes start on the same B
+faces; only `rules.allowFlip` differs. The source A shapes are mirrored into
+stored piece geometry, and starts have `flipped: false`.
+
+Definitions are derived deterministically on demand from the bundled inventory
+in `src/daily/`, then stored as ordinary revision-aware library definitions with
+no collection membership. Attempts use the existing progress map with context
+`daily`; they can appear in Continue, resume across reloads, survive Restart,
+and participate in backups, restore, and Erase progress. The player’s More and
+Solved sheets offer a return to the calendar. Daily routes use
+`?view=daily&date=2026-10-05&flips=false`; calendar routes include month/year.
+
 ## Generated puzzles
 
 The **New puzzle** section on Home has width and height steppers (3–9 each,
 default 6×6) and a **Generate W × H** button that builds a fresh rectangular
 puzzle on the device; the size is remembered for the session. Every generated puzzle has **exactly one solution up to rotating or
 reflecting the whole board**, fills the tray with no spare cells, and allows
-both rotation and flipping. It is saved to the Generated puzzles collection like a
+rotation and the selected flip setting. A **No flips / Flips allowed**
+segmented control below the size steppers defaults to Flips allowed and remembers
+its choice independently of daily play. The rule applies throughout uniqueness
+search, merging, splitting, and stored orientations. No-flip output randomizes
+rotation only and adds `-fixed` to its seed-based ID, preserving existing
+flippable IDs. It is saved to the Generated puzzles collection like a
 standalone import, then opened for play. It is named by its local creation
 time and board size (`2026-09-14 12:34:56 · 9×9`); its ID is derived from the
 board size and the random seed, so the same seed always yields the same pieces.
@@ -362,8 +435,9 @@ Pieces are stored in a random orientation and staged above and below the tray
 (see [Authored field and runtime workspace](#authored-field-and-runtime-workspace)),
 so the saved definition does not reveal the answer, and no solution is written
 into the file. Pieces carry no colour; their order is searched so that
-neighbouring pieces in the solution are never a multiple of six apart and so
-never share a palette colour.
+neighbouring pieces in the solution avoid positions a multiple of the active
+palette length apart and so
+avoid sharing a palette colour (a bounded search may leave a rare clash).
 
 Production builds register a service worker that caches the complete
 application; the app never needs the network after that, so no offline status is

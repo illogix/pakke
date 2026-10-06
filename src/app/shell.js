@@ -3,6 +3,8 @@ import { storage } from './storage.js';
 import { bundledPacks } from '../puzzles/index.js';
 import { LibraryRepository, openDatabase } from '../library/repository.js';
 import { allEntries, entries, collections, saveAttempt, statusOf } from '../library/model.js';
+import { CalendarUI } from './calendar-ui.js';
+import { parseDailyId } from '../daily/calendar.js';
 import { LibraryUI } from './library-ui.js';
 import { prepareOffline } from './offline.js';
 import { validatePuzzle } from '../core/validate.js';
@@ -12,6 +14,7 @@ import { dockSide } from '../ui/layout.js';
 const text = (tag,value,className='') => { const e=document.createElement(tag);e.textContent=value;e.className=className;return e; };
 export class Shell {
     constructor() {
+        this.navigationSerial=0;
         this.footer=document.querySelector('#controls');this.screen=document.querySelector('#screen');
         this.dialog=document.querySelector('#sheet');this.content=this.dialog.querySelector('.sheet-content');
         this.dialog.addEventListener('close',()=>this.returnFocus?.focus());
@@ -41,7 +44,7 @@ export class Shell {
             let backend;
             try { backend=await openDatabase(); } catch (error) { this.storageNotice=`Local storage is unavailable. Bundled puzzles can be played temporarily; changes will not be saved. ${error.message}`; }
             this.repo=await new LibraryRepository(backend).initialize(bundledPacks,storage);
-            this.library=new LibraryUI(this,this.repo);this.library.syncPreferences();this.ready=true;this.route();
+            this.library=new LibraryUI(this,this.repo);this.calendar=new CalendarUI(this,this.repo);this.library.syncPreferences();this.ready=true;this.route();
             prepareOffline();
         } catch(error) {
             this.screen.replaceChildren(text('h1','Your library could not open'),text('p',error.message),text('p','Your existing data has not been replaced. Try closing other game tabs and reloading.'));
@@ -51,7 +54,11 @@ export class Shell {
     route() {
         if(!this.ready)return;
         const params=new URLSearchParams(location.search),id=params.get('puzzle'),packId=params.get('pack'),key=params.get('revision'),view=params.get('view');
-        if(id!==null) {
+        if(view==='daily') {
+            const flips=params.get('flips');
+            this.calendar.openDate(params.get('date'),flips==='true',false).catch(error=>{this.library.home(false);this.library.error(error);});
+        } else if(view==='calendar') this.calendar.show(Number(params.get('month')) || undefined,false);
+        else if(id!==null) {
             let matches=(packId?entries(this.repo.state,packId):allEntries(this.repo.state)).filter(e=>e.def.id===id&&(!key||e.key===key));
             matches=[...new Map(matches.map(e=>[e.key,e])).values()];
             if(matches.length===1)this.open(matches[0].def,false,packId,matches[0].key);
@@ -68,7 +75,7 @@ export class Shell {
     }
     url(params={}, push=true) {
         const url=new URL(location.href);
-        for(const name of ['puzzle','pack','revision','view']) {
+        for(const name of ['puzzle','pack','revision','view','date','flips','month','year']) {
             if(params[name])url.searchParams.set(name,params[name]);else url.searchParams.delete(name);
         }
         if(push)history.pushState(null,'',url);
@@ -83,6 +90,7 @@ export class Shell {
     }
     open(def,push=true,context=null,key=null) {
         if(!this.ready)return;
+        this.navigationSerial++;
         this.library.remember();
         this.record=key?this.repo.state.definitions[key]:Object.values(this.repo.state.definitions).find(r=>r.def.id===def?.id);
         this.context=context;
@@ -92,7 +100,8 @@ export class Shell {
                 body.append(text('p',def?'This puzzle has invalid data and cannot be played.':'That puzzle link does not match an available puzzle.'));
             });return;
         }
-        this.def=def;this.url({puzzle:def.id,pack:context,revision:this.record?.key},push);this.screen.hidden=true;this.footer.hidden=false;
+        const daily=context==='daily' ? parseDailyId(def.id) : null;
+        this.def=def;this.url(daily ? {view:'daily',date:daily.date,flips:String(daily.allowFlip)} : {puzzle:def.id,pack:context,revision:this.record?.key},push);this.screen.hidden=true;this.footer.hidden=false;
         document.querySelector('#game').removeAttribute('inert');
         this.buildDock(def);
         // Apply the measured player viewport before the first scene frame.
@@ -126,7 +135,7 @@ export class Shell {
     }
     menu() {
         this.showSheet(this.def.meta?.name||'Puzzle',body=>{
-            for(const [glyph,label,run] of [['restart','Restart',()=>this.restart()],['help','Help',()=>this.help()],['home','Home',()=>this.leave()]]) {
+            for(const [glyph,label,run] of [['restart','Restart',()=>this.restart()],['help','Help',()=>this.help()],...(this.context==='daily' ? [['calendar','Daily Calendar Puzzles',()=>this.leaveCalendar()]] : []),['home','Home',()=>this.leave()]]) {
                 const b=document.createElement('button');b.type='button';b.className='menu-item';b.innerHTML=icon(glyph);
                 b.append(text('span',label));b.addEventListener('click',run);body.append(b);
             }
@@ -166,6 +175,7 @@ export class Shell {
         this.showSheet(pack&&remaining===0?`${pack.name} complete`:'Solved',body=>{
             if(pack&&remaining>0)body.append(text('p',`${remaining} left in ${pack.name}`,'secondary'));
             const row=text('div','','sheet-actions');
+            if(this.context==='daily')row.append(this.library.action('Daily Calendar Puzzles',()=>this.leaveCalendar(),'text-button primary'));
             if(next)row.append(this.library.action('Next puzzle',()=>this.library.play(next),'text-button primary'));
             row.append(pack?this.library.action('Collections',()=>this.leave(this.context)):this.library.action('Home',()=>this.leave()));
             body.append(row);
@@ -190,6 +200,7 @@ export class Shell {
         });
     }
     /** Leave the player once the latest attempt is saved: Home, or Collections at a pack. */
+    async leaveCalendar() { await this.pendingSave; this.calendar.show(); }
     async leave(packId=null) { await this.pendingSave;if(packId)this.library.collections(packId);else this.library.home(); }
     settings() { this.library.settings(); }
 }

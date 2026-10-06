@@ -4,13 +4,13 @@
 // fallback when no arrangement fits.
 
 import { bounds } from './geometry.js';
-import { containerKeys, containment, orientedBounds } from './puzzle.js';
+import { boardCells, containerKeys, containment, orientedBounds } from './puzzle.js';
 
 const GAP = 1;
 
 /** Tray bounding box. */
 export function trayBounds(def) {
-    return bounds(def.container.cells);
+    return bounds(boardCells(def));
 }
 
 /**

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { bounds, cellKey, orient, outlineEdges } from '../core/geometry.js';
-import { findPiece, orientedBounds, placedCells } from '../core/puzzle.js';
+import { boardCells, findPiece, orientedBounds, placedCells } from '../core/puzzle.js';
 import { flipOrientation, flipPiece, rotatePiece, setPlacement } from '../core/state.js';
 import { computeViolations } from '../core/violations.js';
 import { isSolved, validProgress } from '../core/completion.js';
@@ -8,7 +8,7 @@ import { clampToWorkspace, snapPlacement } from '../core/workspace.js';
 import { rotatedGrabPoint, flippedGrabPoint, mirrorIsVertical, pressAction, pressSlop, LONG_PRESS_MS } from '../ui/interaction.js';
 import { createCamera, displayCell, displayToScreen, screenToDisplay, screenToWorld, panCamera, zoomAt, reframeCamera, cameraIsInitial, clampCamera, openingState, sameView } from '../ui/camera.js';
 import { paintMaterial, paintTray } from '../ui/materials.js';
-import { gridAlpha, inkAlpha, pieceColor, theme, watchScheme } from '../ui/theme.js';
+import { pieceColor, theme, watchScheme } from '../ui/theme.js';
 import { storage } from '../app/storage.js';
 
 // Phaser owns the rendering loop. Native captured Pointer Events own gestures.
@@ -28,7 +28,7 @@ export default class PlayScene extends Phaser.Scene {
         this.board=this.add.graphics();this.footprint=this.add.graphics().setDepth(1);this.tray=null;this.trayCorners=null;
         this.cameras.main.setBackgroundColor(theme.page);
         this.abort=new AbortController();const signal=this.abort.signal;const canvas=this.game.canvas;
-        canvas.tabIndex=0;canvas.setAttribute('aria-label','Puzzle board. Drag pieces, pan empty canvas, pinch or scroll to zoom.');
+        canvas.tabIndex=0;canvas.setAttribute('aria-label',`${this.def.meta?.name ?? 'Puzzle'}. ${this.def.container.holes?.length ? this.def.meta?.description ?? '' : ''} Drag pieces, pan empty canvas, pinch or scroll to zoom.`);
         const on=(target,name,fn,options={})=>target.addEventListener(name,fn,{...options,signal});
         on(canvas,'pointerdown',e=>this.pointerDown(e));on(canvas,'pointermove',e=>this.pointerMove(e));
         on(canvas,'pointerup',e=>this.pointerUp(e));
@@ -83,15 +83,18 @@ export default class PlayScene extends Phaser.Scene {
         // Faint dots at lattice points; the tray texture covers those inside it.
         const [left,top]=screenToDisplay(c,0,0);const [right,bottom]=screenToDisplay(c,width,height);
         // Skip dots on tray corners too: half-covered, they read as stray cell lines.
-        const radius=Math.max(.8,c.size*.04);g.fillStyle(theme.grid,gridAlpha);
-        const cells=this.def.container.cells.map(([x,y])=>displayCell(this.def,x,y));
+        const radius=Math.max(.8,c.size*.04);g.fillStyle(theme.grid,theme.gridAlpha);
+        const cells=boardCells(this.def).map(([x,y])=>displayCell(this.def,x,y));
         const covered=this.trayCorners??=new Set(cells.flatMap(([x,y])=>[cellKey(x,y),cellKey(x+1,y),cellKey(x,y+1),cellKey(x+1,y+1)]));
         for(let x=Math.floor(Math.min(left,right));x<=Math.ceil(Math.max(left,right));x++)
             for(let y=Math.floor(Math.min(top,bottom));y<=Math.ceil(Math.max(top,bottom));y++) {
                 if(covered.has(cellKey(x,y)))continue;const [px,py]=displayToScreen(c,x,y);g.fillCircle(px,py,radius);
             }
         if(!this.tray) {
-            const key=`tray:${this.def.id}`,canvas=document.createElement('canvas'),metrics=paintTray(canvas,cells);
+            const key=`tray:${this.def.id}`,canvas=document.createElement('canvas'),metrics=paintTray(canvas,cells,{
+                holes:(this.def.container.holes??[]).map(([x,y])=>displayCell(this.def,x,y)),
+                labels:(this.def.container.labels??[]).map(label=>({...label,cell:displayCell(this.def,...label.cell)}))
+            });
             this.textures.addCanvas(key,canvas);this.tray={key,metrics,image:this.add.image(0,0,key).setOrigin(0).setDepth(.5)};
         }
         const {metrics,image}=this.tray,[px,py]=displayToScreen(c,metrics.box.minX,metrics.box.minY),scale=c.size/metrics.unit;
@@ -133,7 +136,7 @@ export default class PlayScene extends Phaser.Scene {
         this.footprint.clear();
         if(active) {
             const cells=placedCells(findPiece(this.def,active.id),candidate);
-            this.footprint.fillStyle(theme.ink,inkAlpha.footprint);this.footprint.lineStyle(1,theme.ink,inkAlpha.footprintEdge);
+            this.footprint.fillStyle(theme.ink,theme.footprintAlpha);this.footprint.lineStyle(1,theme.ink,theme.footprintEdgeAlpha);
             for(const [x,y] of cells) {const [px,py]=displayToScreen(this.camera,...displayCell(this.def,x,y));this.footprint.fillRect(px,py,this.camera.size,this.camera.size);}
             for(const e of outlineEdges(cells.map(([x,y])=>displayCell(this.def,x,y)))) {
                 this.footprint.lineBetween(...displayToScreen(this.camera,e.x1,e.y1),...displayToScreen(this.camera,e.x2,e.y2));
@@ -149,13 +152,13 @@ export default class PlayScene extends Phaser.Scene {
             let visual=this.visuals.get(id);
             if(!visual) {
                 const key=`piece:${this.def.id}:${id}`;const canvas=document.createElement('canvas');
-                const metrics=paintMaterial(canvas,geometry.cells,pieceColor(this.def,id),options);
+                const metrics=paintMaterial(canvas,geometry.cells,pieceColor(this.def,id,placement.flipped),options);
                 this.textures.addCanvas(key,canvas);
                 visual={key,image:this.add.image(0,0,key).setOrigin(0),metrics,signature,canvas};this.visuals.set(id,visual);
             } else if(visual.signature!==signature) {
                 // One texture per piece, bounded memory even after many invalid placements.
                 const scratch=visual.scratch??(visual.scratch=document.createElement('canvas'));
-                visual.metrics=paintMaterial(scratch,geometry.cells,pieceColor(this.def,id),options);
+                visual.metrics=paintMaterial(scratch,geometry.cells,pieceColor(this.def,id,placement.flipped),options);
                 const texture=this.textures.get(visual.key);texture.setSize(scratch.width,scratch.height);
                 texture.context.clearRect(0,0,scratch.width,scratch.height);texture.context.drawImage(scratch,0,0);texture.refresh();
                 visual.image.setTexture(visual.key);visual.signature=signature;

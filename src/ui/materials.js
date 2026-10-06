@@ -1,6 +1,6 @@
 import { bounds, cellKey } from '../core/geometry.js';
 import { silhouetteLoops } from './silhouette.js';
-import { cssColor, gridAlpha, rgba, theme } from './theme.js';
+import { cssColor, rgba, theme } from './theme.js';
 
 export const MATERIAL_UNIT = 96;
 export const MATERIAL_PAD = 24;
@@ -33,7 +33,6 @@ function sizeCanvas(canvas, cells) {
 export function paintMaterial(canvas, cells, color, { locked=false, selected=false, lifted=false, invalid=[] }={}) {
     const { box, unit, pad, ctx }=sizeCanvas(canvas, cells);
     const path=roundedPath(silhouetteLoops(cells),unit,pad,unit*PIECE_RADIUS);
-    const dark=theme.scheme==='dark';
     if (selected) {
         // Ink ring just outside the separation edge; the fill and edge cover its inner part.
         ctx.strokeStyle=cssColor(theme.ink); ctx.lineJoin='round';
@@ -42,7 +41,7 @@ export function paintMaterial(canvas, cells, color, { locked=false, selected=fal
     ctx.save();
     // Flat at rest; only a lifted piece casts a soft shadow. Locked pieces sit in a faint contact shade.
     if (lifted || locked) {
-        ctx.shadowColor=dark?'rgba(0,0,0,.5)':locked?'rgba(20,20,20,.16)':'rgba(20,20,20,.22)';
+        ctx.shadowColor=rgba(theme.pieceShadow,lifted ? theme.liftedShadowAlpha : theme.lockedShadowAlpha);
         ctx.shadowBlur=lifted?14:3; ctx.shadowOffsetY=lifted?7:1.5;
     }
     ctx.fillStyle=cssColor(color); ctx.fill(path,'evenodd'); ctx.restore();
@@ -53,15 +52,15 @@ export function paintMaterial(canvas, cells, color, { locked=false, selected=fal
         const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0; return seed/4294967296;};
         for (let i=0;i<box.width*box.height*450;i++) {
             const x=pad+random()*box.width*unit, y=pad+random()*box.height*unit;
-            ctx.fillStyle=i%2?'rgba(255,255,255,.2)':'rgba(20,20,20,.14)';
+            ctx.fillStyle=i%2 ? rgba(theme.grainHighlight,theme.grainHighlightAlpha) : rgba(theme.grainShade,theme.grainShadeAlpha);
             ctx.fillRect(x,y,1.4,1.4);
         }
     }
-    ctx.fillStyle=`rgba(0,0,0,${theme.invalidAlpha})`;
+    ctx.fillStyle=rgba(theme.invalidShade,theme.invalidAlpha);
     for(const [x,y] of invalid) ctx.fillRect(pad+x*unit,pad+y*unit,unit,unit);
     // Faint identical seams, including the valid/invalid boundary.
     const keys=new Set(cells.map(c=>cellKey(...c)));
-    ctx.strokeStyle='rgba(0,0,0,.06)'; ctx.lineWidth=1.2; ctx.beginPath();
+    ctx.strokeStyle=rgba(theme.pieceSeam,theme.pieceSeamAlpha); ctx.lineWidth=1.2; ctx.beginPath();
     for(const [x,y] of cells) {
         if(keys.has(cellKey(x+1,y))) {ctx.moveTo(pad+(x+1)*unit,pad+y*unit);ctx.lineTo(pad+(x+1)*unit,pad+(y+1)*unit);}
         if(keys.has(cellKey(x,y+1))) {ctx.moveTo(pad+x*unit,pad+(y+1)*unit);ctx.lineTo(pad+(x+1)*unit,pad+(y+1)*unit);}
@@ -73,15 +72,27 @@ export function paintMaterial(canvas, cells, color, { locked=false, selected=fal
 }
 
 /** The tray: one flat rounded silhouette in the field colour with faint cell lines. */
-export function paintTray(canvas, cells) {
+export function paintTray(canvas, cells, { holes = [], labels = [] } = {}) {
     const { box, unit, pad, ctx }=sizeCanvas(canvas, cells);
     const local=cells.map(([x,y])=>[x-box.minX,y-box.minY]);
     const path=roundedPath(silhouetteLoops(local),unit,pad,unit*TRAY_RADIUS);
     ctx.fillStyle=cssColor(theme.field); ctx.fill(path,'evenodd');
     ctx.save(); ctx.clip(path,'evenodd');
-    ctx.strokeStyle=rgba(theme.grid,gridAlpha); ctx.lineWidth=Math.max(1.5,unit*0.025); ctx.beginPath();
+    ctx.strokeStyle=rgba(theme.grid,theme.gridAlpha); ctx.lineWidth=Math.max(1.5,unit*0.025); ctx.beginPath();
     for(let x=1;x<box.width;x++) {ctx.moveTo(pad+x*unit,0);ctx.lineTo(pad+x*unit,canvas.height);}
     for(let y=1;y<box.height;y++) {ctx.moveTo(0,pad+y*unit);ctx.lineTo(canvas.width,pad+y*unit);}
-    ctx.stroke(); ctx.restore();
+    ctx.stroke();
+    ctx.fillStyle=cssColor(theme.panel);
+    for (const [x,y] of holes) ctx.fillRect(pad+(x-box.minX)*unit+unit*.045,pad+(y-box.minY)*unit+unit*.045,unit*.91,unit*.91);
+    ctx.restore();
+    const blocked = new Set(holes.map(c => cellKey(...c)));
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    for (const {cell: [x,y], text} of labels) {
+        const hole = blocked.has(cellKey(x,y));
+        ctx.fillStyle=cssColor(theme.ink);
+        const fontSize=unit*(text.length > 2 ? .30 : .34);
+        ctx.font=`${hole ? 800 : 600} ${fontSize}px ui-rounded, system-ui, sans-serif`;
+        ctx.fillText(text,pad+(x-box.minX+.5)*unit,pad+(y-box.minY+.52)*unit,unit*.85);
+    }
     return { unit, pad, box };
 }

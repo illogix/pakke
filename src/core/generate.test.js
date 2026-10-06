@@ -47,6 +47,17 @@ describe('generatePuzzle', () => {
         expect(analysis.exhausted).toBe(true);
     });
 
+    it.each([[3, 3, 1], [4, 5, 2], [6, 6, 3], [8, 8, 4]])('generates a rotations-only %ix%i puzzle for seed %i', (width, height, seed) => {
+        const { def, solution, ok } = generatePuzzle({ width, height, seed, allowFlip: false }, frozen);
+        expect(ok).toBe(true); expect(def.rules.allowFlip).toBe(false);
+        expect(solution.every(p => !p.flipped)).toBe(true);
+        let state = createState(def);
+        for (const {pieceId, ...placement} of solution) state = setPlacement(def, state, pieceId, placement);
+        expect(isSolved(def, state)).toBe(true);
+        expect(analyseDef(def, {cap: 2})).toMatchObject({orbits: 1, exhausted: true});
+        expect(def.id).not.toBe(generatePuzzle({width, height, seed}, frozen).def.id);
+    });
+
     it('is deterministic for a seed', () => {
         const a = generatePuzzle({ width: 6, height: 6, seed: 11, createdAt: 0 }, frozen);
         const b = generatePuzzle({ width: 6, height: 6, seed: 11, createdAt: 0 }, frozen);
@@ -120,8 +131,8 @@ describe('generatePuzzle', () => {
         expect(Math.min(...xs) + Math.max(...xs) + 1).toBe(def.field.width);
     });
 
-    it('orders pieces so neighbours in the solution take different palette colours', () => {
-        const { def, solution } = generatePuzzle({ width: 8, height: 8, seed: 5 }, frozen);
+    it.each([4, 6])('orders pieces so neighbours take different colors with a %i-color palette', paletteSize => {
+        const { def, solution } = generatePuzzle({ width: 8, height: 8, seed: 5, paletteSize }, frozen);
         const owner = new Map();
 
         for (const { pieceId, ...placement } of solution) {
@@ -139,7 +150,7 @@ describe('generatePuzzle', () => {
             for (const [dx, dy] of [[1, 0], [0, 1]]) {
                 const other = owner.get(`${x + dx},${y + dy}`);
 
-                if (other && other !== piece) expect(def.pieces.indexOf(other) % 6).not.toBe(def.pieces.indexOf(piece) % 6);
+                if (other && other !== piece) expect(def.pieces.indexOf(other) % paletteSize).not.toBe(def.pieces.indexOf(piece) % paletteSize);
             }
         }
     });

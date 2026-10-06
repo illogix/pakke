@@ -26,7 +26,8 @@ untracked, so it is present locally but never committed.
 - `src/puzzles/` — bundled JSON definitions and explicitly ordered pack manifest
 - `src/library/` — content identity, exchange validation, revision-aware library model and IndexedDB repository; no Phaser imports
 - `src/app/` — player shell, Home and Collections UI, generator controls and their Web Worker, offline registration, legacy-save migration adapter
-- `src/ui/` — camera/interaction math, theme, silhouettes, materials, and icons.
+- `src/themes/palettes.js` — shared pure theme color values and variable-length piece palettes.
+- `src/ui/` — camera/interaction math, theme application, silhouettes, materials, and icons.
   Math is pure; material/icon helpers also use browser canvas/DOM APIs.
 - `src/scenes/` — Phaser scenes, default-exported classes extending `Phaser.Scene`
 - `src/main.js` — `Phaser.Game` config and scene registration

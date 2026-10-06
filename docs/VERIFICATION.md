@@ -1,9 +1,68 @@
 # Verification and release checks
 
-Current testing guide, reviewed October 2, 2026. This replaces the completed
+Current testing guide, reviewed October 6, 2026. This replaces the completed
 player/library implementation reports. Product behavior is documented in
 [DESIGN.md](../DESIGN.md); unfinished verification and optional features are
 tracked outside this repo.
+
+## Theme checks
+
+Theme values live in `src/themes/palettes.js`; CSS and browser theme colors are
+rendered from that data by `scripts/theme-plugin.js`. Unit checks cover matching
+token sets, pre-boot CSS generation, explicit palette-change notifications,
+optional face colors, and a four-color palette cycling twice across eight pieces.
+Generator checks use both four- and six-color neighbor ordering.
+
+On October 6, `npm run check` passed all 462 tests and the production build.
+The daily browser script also checks pre-boot light/dark tokens with JavaScript
+disabled, matching primary colors on Today/calendar (including hover), Home
+surface colors, live board theme changes, actual tray texture pixels, and dock
+colors. Settings checks cover the System default, fixed choices ignoring OS
+changes on Home and the board, reload persistence, System following OS changes,
+and a backup restoring the applied theme. Selected controls use Surface2 over
+Surface0 in both schemes, giving them stronger contrast while keeping them
+subdued beside primary buttons. All 41 browser checks passed with no page
+errors; Home, board, and Settings screenshots were visually inspected. Screenshots include `theme-board-light.png`
+and `theme-board-dark.png`, plus `theme-settings-light.png` and
+`theme-settings-dark.png`.
+
+## Daily mode checks
+
+`src/daily/calendar.test.js` validates all 730 emitted 2026 date/mode definitions
+against independent saved research witnesses, including exact coverage, excluded
+month/day squares, starting B faces, and legal flips. It also checks separate
+progress, Continue, solved history after Restart, backup/restore, date validity,
+and local-date handling. Board annotation and theme tests cover malformed
+labels/holes, staging translation, optional flipped colors, and identity.
+The generator tests now exercise both rule settings, with a regression for
+unsafe symmetry pruning against unavailable mirrored orientations. Labeled
+board analysis counts arrangements on the fixed board rather than symmetry orbits.
+
+The optional browser check uses an existing Playwright installation and a
+running Vite server:
+
+```sh
+node scripts/daily-browser-check.mjs
+```
+
+`PLAYWRIGHT_MODULE`, `CHROME_PATH`, and `PUZZLE_URL` can select installed tooling
+and the server. On October 5, 2026, 30 checks passed with no page errors:
+Home entry, mode selection, native piece input, independent attempts/completion,
+resume/reload/history, Continue restoring its date and mode, month dropdown and range limits, generation without
+flips, separation from Collections, backup/erase/restore, and flip color painting.
+Both schemes passed layout checks at 320×568, 390×844, and 844×390; screenshots
+under ignored `docs/verification/daily-*.png` were visually inspected.
+`npm run check` passed all 448 tests and the production build.
+
+Production offline check (start `npm run preview` first):
+
+```sh
+node scripts/daily-offline-check.mjs
+```
+
+On October 5, the production app reloaded Home offline, derived a previously
+unopened January 17 flippable puzzle offline, and reloaded its daily route,
+with no page errors. This uses the same tooling environment variables.
 
 ## Automated checks
 
@@ -29,7 +88,10 @@ node scripts/generator-bench.mjs            # 20 seeds, sizes 4–9
 node scripts/generator-bench.mjs 50 6,9     # seeds, then sizes
 ```
 
-Rerun it after changing the solver, partitioner, or `GENERATOR_LIMITS`. On the
+Rerun it after changing the solver, partitioner, or `GENERATOR_LIMITS`.
+October 5, 2026, 12 seeds per size: flippable 6/8/9 medians 3/106/1090 ms,
+p95 20/581/2371 ms; rotations-only 1/30/465 ms, p95 6/40/1222 ms. All 72
+runs succeeded. The default flippable path retains its previous behavior. On the
 desktop host, September 14, 2026: 6×6 took about 3 ms median, 8×8 about 120 ms
 median and 660 ms p95, and 9×9 about 950 ms median and 1.6 s p95 in Node, all
 with 12 of 12 seeds succeeding. After adding the piece-size cap (same day, 50

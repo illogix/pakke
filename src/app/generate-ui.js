@@ -1,5 +1,7 @@
 // New puzzle on Home: pick a board size, generate a unique-solution puzzle in a
 // worker, save it to Generated puzzles, and open it.
+import { theme } from '../ui/theme.js';
+import { modeControl } from './mode-control.js';
 import { iconButton } from '../ui/icons.js';
 import { GENERATOR_LIMITS, generatePuzzle } from '../core/generate.js';
 import { inspectContent } from '../library/format.js';
@@ -20,7 +22,10 @@ export function newPuzzleSection(shell, library) {
     const label = () => { button.textContent = `Generate ${session.width} × ${session.height}`; };
     steppers.append(stepper('Width', 'width', label), stepper('Height', 'height', label));
     button.addEventListener('click', () => generate(shell, library)); label();
-    section.append(heading, steppers, button);
+    const mode = modeControl(library.state.preferences['generator-allow-flip'] !== false, async value => {
+        try { await library.preference('generator-allow-flip', value); } catch (error) { library.error(error); throw error; }
+    }, { label: 'Generated pieces can flip' });
+    section.append(heading, steppers, mode, button);
     return section;
 }
 
@@ -64,7 +69,7 @@ function generate(shell, library) {
         } catch (error) { library.error(error); }
     };
     const fail = message => { if (!settled) { stop(); library.error(new Error(message)); } };
-    const options = { width, height, seed, allowHoles };
+    const options = { width, height, seed, allowHoles, paletteSize: theme.pieces.length, allowFlip: library.state.preferences['generator-allow-flip'] !== false };
     try {
         worker = new Worker(new URL('./generator.worker.js', import.meta.url), { type: 'module' });
         worker.onmessage = ({ data }) => {

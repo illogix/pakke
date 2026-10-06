@@ -20,6 +20,11 @@ export function orientedBounds(piece, placement) {
     return bounds(orient(piece.cells, placement.rotation, placement.flipped));
 }
 
+/** All visible board squares, including non-playable holes. */
+export function boardCells(def) {
+    return [...def.container.cells, ...(def.container.holes ?? [])];
+}
+
 export function containerKeys(def) {
     return new Set(def.container.cells.map(([x, y]) => cellKey(x, y)));
 }
@@ -46,7 +51,7 @@ export function findPiece(def, pieceId) {
  * starts with, plus a border wide enough that edge pieces stay grabbable.
  */
 export function deriveField(def, border = FIELD_BORDER) {
-    const all = [...def.container.cells];
+    const all = boardCells(def);
 
     for (const piece of def.pieces) {
         all.push(...placedCells(piece, piece.start));
@@ -65,7 +70,7 @@ export function deriveField(def, border = FIELD_BORDER) {
  * Returns the new definition and the shift applied to the tray.
  */
 export function stagePieces(def, { gap = 1, minRowWidth = 10, border = FIELD_BORDER } = {}) {
-    const tray = bounds(def.container.cells);
+    const tray = bounds(boardCells(def));
     const centre = tray.minX + tray.width / 2;
     const rowWidth = Math.max(minRowWidth, tray.width + 4);
     const free = def.pieces.filter((piece) => !piece.locked);
@@ -122,13 +127,15 @@ export function stagePieces(def, { gap = 1, minRowWidth = 10, border = FIELD_BOR
     }
 
     const staged = def.pieces.map((piece) => ({ ...piece, start: starts.get(piece.id) ?? piece.start }));
-    const all = [...def.container.cells, ...staged.flatMap((piece) => placedCells(piece, piece.start))];
+    const all = [...boardCells(def), ...staged.flatMap((piece) => placedCells(piece, piece.start))];
     const box = bounds(all);
     const dx = border - box.minX;
     const dy = border - box.minY;
     const next = {
         ...def,
-        container: { ...def.container, cells: translate(def.container.cells, dx, dy) },
+        container: { ...def.container, cells: translate(def.container.cells, dx, dy),
+            ...(def.container.holes !== undefined ? { holes: translate(def.container.holes, dx, dy) } : {}),
+            ...(def.container.labels !== undefined ? { labels: def.container.labels.map(label => ({ ...label, cell: [label.cell[0] + dx, label.cell[1] + dy] })) } : {}) },
         pieces: staged.map((piece) => ({ ...piece, start: { ...piece.start, x: piece.start.x + dx, y: piece.start.y + dy } }))
     };
 

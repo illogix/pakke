@@ -1,20 +1,9 @@
-/* Tokens: Catppuccin Latte, and Mocha in the dark. Keep in step with schemes
-   in src/ui/theme.js, which the board uses. */
+/* Color tokens are generated from src/themes/palettes.js into the HTML head
+   and updated by src/ui/theme.js. */
 :root {
-    --bg:#eff1f5; --panel:#e6e9ef; --field:#ccd0da; --hairline:#bcc0cc; --ink:#4c4f69; --secondary:#6c6f85;
-    --hover:#ccd0da; --pressed:#bcc0cc; --started:#9ca0b0;
-    --primary-bg:#4c4f69; --primary-ink:#eff1f5; --scrim:#4c4f6940;
     --font:ui-rounded,"SF Pro Rounded",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-    color-scheme:light; font-family:var(--font); color:var(--ink); background:var(--bg); font-synthesis:none;
+    font-family:var(--font); color:var(--ink); background:var(--bg); font-synthesis:none;
     -webkit-text-size-adjust:100%;
-}
-@media (prefers-color-scheme:dark) {
-    :root {
-        --bg:#1e1e2e; --panel:#181825; --field:#313244; --hairline:#45475a; --ink:#cdd6f4; --secondary:#a6adc8;
-        --hover:#313244; --pressed:#45475a; --started:#6c7086;
-        --primary-bg:#cdd6f4; --primary-ink:#1e1e2e; --scrim:#11111b99;
-        color-scheme:dark;
-    }
 }
 * {box-sizing:border-box}
 body {margin:0;background:var(--bg);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
@@ -121,7 +110,7 @@ button:disabled {cursor:default;opacity:.3}
 .notice {padding:14px;border-radius:14px;background:var(--panel);font-size:15px;line-height:1.5;margin:0 0 20px}
 
 /* Sheets */
-#sheet {padding:0;border:0;border-radius:20px;background:var(--bg);color:var(--ink);max-width:480px;width:calc(100% - 24px);max-height:calc(100dvh - 40px);box-shadow:0 24px 80px #0000003a}
+#sheet {padding:0;border:0;border-radius:20px;background:var(--bg);color:var(--ink);max-width:480px;width:calc(100% - 24px);max-height:calc(100dvh - 40px);box-shadow:0 24px 80px var(--sheet-shadow)}
 #sheet::backdrop {background:var(--scrim)}
 .sheet-content {padding:20px}
 .sheet-content header {display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-6px -10px 4px 0}
@@ -149,3 +138,34 @@ summary {cursor:pointer;min-height:44px;padding:12px 0;font-weight:600}
 .file-message {white-space:pre-line;overflow-wrap:anywhere}
 
 @media (prefers-reduced-motion:reduce) {* {transition:none!important;scroll-behavior:auto!important}}
+
+/* Rule choice shared by daily play and generation. */
+.mode-control {display:flex;gap:4px;min-width:0;margin:0;padding:4px;border:0;border-radius:14px;background:var(--panel)}
+.mode-control label {position:relative;flex:1;display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 8px;border-radius:10px;color:var(--secondary);font-size:15px;font-weight:500;cursor:pointer}
+.mode-control input {position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.mode-control label:has(input:checked) {background:var(--selected-bg);color:var(--ink);font-weight:700}
+.mode-control label:has(input:focus-visible) {outline:2px solid var(--ink);outline-offset:1px}
+.mode-control:disabled {opacity:.6}
+.daily-actions {display:flex;gap:8px}
+.daily-actions .primary-button {flex:1;min-width:0}
+.daily-actions .calendar-button {width:56px;height:56px;flex-basis:56px;background:var(--primary-bg);color:var(--primary-ink)}
+.daily-actions .calendar-button:hover:not(:disabled),.daily-actions .calendar-button:active:not(:disabled) {background:var(--primary-bg)}
+.calendar-header {display:flex;align-items:center;justify-content:space-between;margin:8px 0 18px}
+.calendar-month {display:flex;flex-direction:column;align-items:center;min-width:0}
+.calendar-month select {max-width:100%;min-height:44px;padding:0 8px;border:0;border-radius:10px;background:transparent;font-size:24px;font-weight:700;text-align:center;cursor:pointer}
+.calendar-year {color:var(--secondary);font-size:16px}
+.calendar-page .mode-control {margin-bottom:20px}
+.calendar-grid {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px 0}
+.calendar-weekday {padding:10px 0;text-align:center;font-size:13px;font-weight:600;color:var(--secondary)}
+.calendar-day {min-width:0;min-height:64px;padding:4px 0;border:0;border-radius:14px;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.calendar-day:hover:not(:disabled) {background:var(--panel)}
+.calendar-number {width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600}
+.calendar-day.is-today .calendar-number {border:1.5px solid var(--ink);border-radius:50%}
+.calendar-dots {display:flex;gap:6px;height:8px}
+.calendar-dot {display:inline-block;width:8px;height:8px;border:1.5px solid currentColor;border-radius:50%;flex-shrink:0}
+.calendar-dot.fixed {color:var(--calendar-blue)}
+.calendar-dot.flippable {color:var(--calendar-yellow)}
+.calendar-dot.completed {background:currentColor}
+.calendar-dot.unattempted {visibility:hidden}
+/* Seven 44 px date targets fit on a 320 px screen, with a 6 px edge margin. */
+@media (max-width:359px) {.calendar-grid {margin-inline:-14px}.calendar-page .page-title {font-size:30px}}

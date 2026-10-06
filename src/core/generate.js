@@ -16,6 +16,7 @@ import { createRandom } from './random.js';
 import { shapeMultiset } from './shapes.js';
 import { countSolutions, createRegion, indexPiece, solutionKey } from './solver.js';
 import { randomPartition } from './partition.js';
+import { schemes } from '../themes/palettes.js';
 
 export const GENERATOR_LIMITS = Object.freeze({
     minSize: 3,
@@ -52,9 +53,8 @@ export const GENERATED_RULES = Object.freeze({
     completion: 'all-pieces-contained'
 });
 
-// Uncoloured pieces take the theme's six palette colours in definition order
-// (src/ui/theme.js), so piece order decides colour.
-const PALETTE_SIZE = 6;
+// Pure palette data provides the default; the UI passes the active palette size.
+const DEFAULT_PALETTE_SIZE = schemes.light.pieces.length;
 
 const MARGIN = 2;
 
@@ -62,7 +62,8 @@ const STEPS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 /**
  * Generate a puzzle. `options.createdAt` (epoch ms, default now) names it by
- * local date and time. Returns `{ ok: true, def, solution, stats }` or
+ * local date and time. `options.paletteSize` controls neighbor-color ordering;
+ * by default it uses the light palette length. Returns `{ ok: true, def, solution, stats }` or
  * `{ ok: false, reason: 'timeout', stats }`. The solution is for tests and the
  * UI; it is deliberately not part of the emitted definition.
  *
@@ -70,7 +71,8 @@ const STEPS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
  * `{ pieces, merges, nodes }` after every solver run.
  */
 export function generatePuzzle(options = {}, hooks = {}) {
-    const limits = { ...GENERATOR_LIMITS, ...options };
+    const rules = { ...GENERATED_RULES, allowFlip: options.allowFlip !== false };
+    const limits = { ...GENERATOR_LIMITS, ...options, rules, paletteSize: (Number.isInteger(options.paletteSize) && options.paletteSize > 0 ? options.paletteSize : DEFAULT_PALETTE_SIZE) };
     const now = hooks.now ?? (() => Date.now());
     const onProgress = hooks.onProgress ?? (() => {});
     const width = clampSize(options.width ?? limits.defaultWidth, limits);
@@ -92,7 +94,7 @@ export function generatePuzzle(options = {}, hooks = {}) {
 
     if (!pieces) return { ok: false, reason: 'timeout', stats };
 
-    const { def, solution } = emit(pieces, { width, height, seed, createdAt: options.createdAt ?? Date.now() }, random);
+    const { def, solution } = emit(pieces, { width, height, seed, rules, paletteSize: limits.paletteSize, createdAt: options.createdAt ?? Date.now() }, random);
     const errors = validatePuzzle(def).errors;
 
     if (errors.length) throw new Error(`generated an invalid puzzle: ${errors.join('; ')}`);
@@ -166,8 +168,8 @@ function carveSizes(limits) {
 
 /** One solver run over the current pieces, with progress and node accounting. */
 function verify(region, pieces, limits, clock) {
-    const shapes = shapeMultiset(pieces, GENERATED_RULES);
-    const result = countSolutions(region, shapes, GENERATED_RULES, { cap: 2, nodeBudget: limits.nodeBudget });
+    const shapes = shapeMultiset(pieces, limits.rules);
+    const result = countSolutions(region, shapes, limits.rules, { cap: 2, nodeBudget: limits.nodeBudget });
 
     clock.stats.nodes += result.nodes;
     clock.onProgress({ pieces: pieces.length, merges: clock.stats.merges, nodes: clock.stats.nodes });
@@ -292,8 +294,8 @@ function mergeOnce(pieces, other, limits, random) {
 }
 
 /** Turn a partition into a playable definition plus the placements that solve it. */
-function emit(pieces, { width, height, seed, createdAt }, random) {
-    const ordered = paletteOrder(pieces, random);
+function emit(pieces, { width, height, seed, createdAt, rules, paletteSize }, random) {
+    const ordered = paletteOrder(pieces, random, paletteSize);
     const defPieces = [];
     const solution = [];
 
@@ -302,8 +304,8 @@ function emit(pieces, { width, height, seed, createdAt }, random) {
         const shape = normalise(cells);
         // Store the shape in a random orientation so the staged piece does not
         // give away how it sits in the solution.
-        const stored = orient(shape, random.int(4), random.next() < 0.5);
-        const { rotation, flipped } = orientationBack(stored, shape);
+        const stored = orient(shape, random.int(4), rules.allowFlip && random.next() < 0.5);
+        const { rotation, flipped } = orientationBack(stored, shape, rules);
         const at = bounds(cells);
 
         defPieces.push({ id, cells: stored, start: { x: 0, y: 0, rotation: 0, flipped: false }, locked: false });
@@ -312,7 +314,7 @@ function emit(pieces, { width, height, seed, createdAt }, random) {
 
     const def = {
         schemaVersion: 1,
-        id: `gen-${width}x${height}-${seed.toString(36)}`,
+        id: `gen-${width}x${height}-${seed.toString(36)}${rules.allowFlip ? '' : '-fixed'}`,
         type: 'square-grid-packing',
         meta: {
             name: `${timestamp(createdAt)} · ${width}×${height}`,
@@ -321,7 +323,7 @@ function emit(pieces, { width, height, seed, createdAt }, random) {
             tags: ['generated']
         },
         container: { cells: rectangle(width, height) },
-        rules: { ...GENERATED_RULES },
+        rules: { ...rules },
         pieces: defPieces,
         presentation: { fieldRotation: 0 }
     };
@@ -341,10 +343,10 @@ function timestamp(ms) {
 }
 
 /** The orientation that takes `stored` back to `target` (both normalised). */
-function orientationBack(stored, target) {
+function orientationBack(stored, target, rules) {
     const want = JSON.stringify(target);
 
-    for (const flipped of [false, true]) {
+    for (const flipped of (rules.allowFlip ? [false, true] : [false])) {
         for (let rotation = 0; rotation < 4; rotation++) {
             if (JSON.stringify(orient(stored, rotation, flipped)) === want) return { rotation, flipped };
         }
@@ -358,7 +360,7 @@ function orientationBack(stored, target) {
  * sit a multiple of the palette size apart, so they never share a colour.
  * Gives up after a bounded search; a rare clash is cosmetic.
  */
-function paletteOrder(pieces, random) {
+function paletteOrder(pieces, random, paletteSize) {
     const ownerOf = new Map();
 
     pieces.forEach((piece, index) => piece.forEach(([x, y]) => ownerOf.set(cellKey(x, y), index)));
@@ -378,7 +380,7 @@ function paletteOrder(pieces, random) {
     const pairs = [...edges].map((edge) => edge.split(',').map(Number));
     const order = random.shuffle(pieces.map((_, index) => index));
     const slot = new Array(pieces.length);
-    const clashes = () => pairs.filter(([a, b]) => slot[a] % PALETTE_SIZE === slot[b] % PALETTE_SIZE).length;
+    const clashes = () => pairs.filter(([a, b]) => slot[a] % paletteSize === slot[b] % paletteSize).length;
     const place = () => order.forEach((piece, position) => { slot[piece] = position; });
 
     place();

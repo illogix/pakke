@@ -1,3 +1,4 @@
+import { parseDailyId } from '../daily/calendar.js';
 import { bounds } from '../core/geometry.js';
 import { storage } from './storage.js';
 import { parseFile, inspectContent } from '../library/format.js';
@@ -6,6 +7,8 @@ import { applyImport, applyRestore, allEntries, backupFile, collections, continu
 import { newPuzzleSection } from './generate-ui.js';
 import { icon, iconButton } from '../ui/icons.js';
 import { silhouetteLoops } from '../ui/silhouette.js';
+import { setThemePreference } from '../ui/theme.js';
+import { THEME_CHOICES, themePreference } from '../themes/preferences.js';
 
 export const element = (tag, value = '', className = '') => {
     const node = document.createElement(tag); node.textContent = value; node.className = className; return node;
@@ -52,7 +55,7 @@ export class LibraryUI {
     }
     /** Shared entry to a library page: leave the player and show the page layer. */
     show(page, label, params, push) {
-        this.remember(); this.shell.closeSheet(); this.shell.game.scene.stop('Play'); this.shell.def = null; this.shell.context = null;
+        this.remember(); this.shell.navigationSerial++; this.shell.closeSheet(); this.shell.game.scene.stop('Play'); this.shell.def = null; this.shell.context = null;
         this.shell.url(params, push);
         this.shell.footer.hidden = true; this.shell.screen.hidden = false; this.shell.screen.setAttribute('aria-label', label);
         document.querySelector('#game').setAttribute('inert', '');
@@ -66,7 +69,7 @@ export class LibraryUI {
             this.shell.screen.scrollTop = saved?.top || 0;
         });
     }
-    refresh() { if (this.page === 'collections') this.collections(null, false); else this.home(false); }
+    refresh() { if (this.page === 'collections') this.collections(null, false); else if (this.page === 'calendar') this.shell.calendar.show(undefined, false); else this.home(false); }
     section(label, ...children) {
         const section = element('section', '', 'section'), heading = element('h2', label, 'section-label');
         heading.id = `section-${label.toLowerCase().replace(/\W+/g, '-')}`; section.setAttribute('aria-labelledby', heading.id);
@@ -87,10 +90,10 @@ export class LibraryUI {
         const resume = continuation(this.state);
         if (resume) {
             const pack = collections(this.state).find(p => p.id === resume.packId);
-            const row = this.row(resume.def.meta?.name || resume.def.id, pack?.name || '', () => this.play(resume));
+            const row = this.row(resume.def.meta?.name || resume.def.id, resume.packId === 'daily' ? 'Daily Calendar Puzzles' : pack?.name || '', () => this.play(resume));
             row.dataset.continue = ''; main.append(this.section('Continue', row));
         }
-        main.append(newPuzzleSection(this.shell, this));
+        main.append(this.shell.calendar.homeSection(), newPuzzleSection(this.shell, this));
         const sets = collections(this.state).filter(p => p.id !== 'loose'), count = sets.reduce((n, p) => n + p.keys.length, 0);
         main.append(this.section('Collections', this.row('Hand-made sets', `${plural(sets.length, 'set')} · ${plural(count, 'puzzle')}`, () => this.collections())));
         this.restore(main);
@@ -187,7 +190,12 @@ export class LibraryUI {
                 select('Sort', SORTS, view.sort, v => { view.sort = v; }));
         });
     }
-    play(record) { this.remember(); this.shell.open(record.def, true, record.packId, record.key); }
+    play(record) {
+        this.remember();
+        const daily = record.packId === 'daily' && parseDailyId(record.def.id);
+        if (daily) return this.shell.calendar.openDate(daily.date, daily.allowFlip);
+        this.shell.open(record.def, true, record.packId, record.key);
+    }
     credits(body, meta = {}) {
         for (const [key, label] of [['author', 'Designer'], ['contributor', 'Contributor'], ['catalogNumber', 'Catalog number'], ['attribution', 'Attribution'], ['source', 'Source'], ['license', 'License']]) if (meta[key]) body.append(element('h3', label), element('p', meta[key]));
     }
@@ -297,12 +305,28 @@ export class LibraryUI {
             body.append(row);
         });
     }
-    syncPreferences() { for (const key of ['reduced-motion', 'help-seen']) storage.write(key, this.state.preferences[key] === true); }
+    syncPreferences() {
+        for (const key of ['reduced-motion', 'help-seen']) storage.write(key, this.state.preferences[key] === true);
+        const value = themePreference(this.state.preferences.theme);
+        storage.write('theme', value); setThemePreference(value);
+    }
     async preference(key, value) {
         await this.repo.mutate(s => ({ ...structuredClone(s), preferences: { ...s.preferences, [key]: value } })); storage.write(key, value);
+        if (key === 'theme') setThemePreference(value);
     }
     settings() {
         this.shell.showSheet('Settings', body => {
+            const themeField = element('label', '', 'field'), select = document.createElement('select');
+            select.setAttribute('aria-label', 'Theme');
+            for (const [value, name] of THEME_CHOICES) { const option = element('option', name); option.value = value; select.append(option); }
+            select.value = themePreference(this.state.preferences.theme);
+            select.addEventListener('change', async () => {
+                select.disabled = true;
+                try { await this.preference('theme', select.value); }
+                catch (error) { select.value = themePreference(this.state.preferences.theme); this.error(error); }
+                finally { select.disabled = false; }
+            });
+            themeField.append(document.createTextNode('Theme'), select); body.append(themeField);
             const label = element('label', '', 'preference'), checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = this.state.preferences['reduced-motion'] === true;
             checkbox.addEventListener('change', async () => { try { await this.preference('reduced-motion', checkbox.checked); } catch (e) { checkbox.checked = !checkbox.checked; this.error(e); } });
             label.append(checkbox, document.createTextNode('Reduce motion')); body.append(label);

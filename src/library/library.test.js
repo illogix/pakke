@@ -117,11 +117,22 @@ describe('backup and repository reliability', () => {
     });
     it('keeps conflicting local work by default, allows explicit replacement and unions solved history', async () => {
         let local = await install(emptyLibrary(), file('test-pack', 3)); const r = entries(local, 'test-pack')[0];
+        local.preferences.theme = 'light';
         local = saveAttempt(local, r.key, createState(r.def), 'test-pack', 200); let old = await install(emptyLibrary(), file());
+        old.preferences.theme = 'dark';
         old = saveAttempt(old, r.key, movePiece(r.def, createState(r.def), 'bar', 0, 0), 'test-pack', 100); old.progress[r.gameKey].solved = true;
         const plan = previewRestore(local, old); expect(plan.packConflicts).toHaveLength(1); expect(plan.progressConflicts).toHaveLength(1);
-        const kept = applyRestore(local, plan); expect(kept.progress[r.gameKey].state).toEqual(local.progress[r.gameKey].state); expect(kept.progress[r.gameKey].solved).toBe(true);
-        expect(kept.packs['test-pack'].envelope.pack.revision).toBe(3); const replaced = applyRestore(local, plan, true); expect(replaced.progress[r.gameKey].updatedAt).toBe(100);
+        const kept = applyRestore(local, plan); expect(kept.preferences.theme).toBe('light'); expect(kept.progress[r.gameKey].state).toEqual(local.progress[r.gameKey].state); expect(kept.progress[r.gameKey].solved).toBe(true);
+        expect(kept.packs['test-pack'].envelope.pack.revision).toBe(3); const replaced = applyRestore(local, plan, true); expect(replaced.preferences.theme).toBe('dark'); expect(replaced.progress[r.gameKey].updatedAt).toBe(100);
+    });
+    it.each(['system', 'light', 'dark'])('backs up and restores the %s theme preference', async theme => {
+        const state = await install(emptyLibrary(), file()); state.preferences.theme = theme;
+        const incoming = await validateBackup(backupFile(state));
+        expect(applyRestore(emptyLibrary(), previewRestore(emptyLibrary(), incoming)).preferences.theme).toBe(theme);
+    });
+    it.each([true, false, '', 'sepia', null, 0])('rejects an invalid theme preference: %s', async theme => {
+        const state = await install(emptyLibrary(), file()); state.preferences.theme = theme;
+        await expect(validateBackup(backupFile(state))).rejects.toThrow('unsupported settings');
     });
     it.each(['definition', 'reference', 'attempt', 'setting', 'key'])('rejects corrupt backup %s before writing', async kind => {
         let state = await install(emptyLibrary(), file()); const r = entries(state, 'test-pack')[0]; state = saveAttempt(state, r.key, createState(r.def), null);

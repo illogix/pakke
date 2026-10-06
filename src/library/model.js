@@ -1,6 +1,8 @@
 import { canonical, definitionRecord, inspectContent, isObject, validateDefinitions } from './format.js';
 import { validSavedState } from '../app/storage.js';
+import { parseDailyId } from '../daily/calendar.js';
 import { isSolved } from '../core/completion.js';
+import { validThemePreference } from '../themes/preferences.js';
 
 export function emptyLibrary() {
     return { version: 1, serial: 0, definitions: {}, packs: {}, loose: [], progress: {}, preferences: {}, drafts: {}, migrated: false };
@@ -25,7 +27,7 @@ export function statusOf(state, record) {
     return saved?.solved ? 'Solved' : saved ? 'In progress' : 'Not started';
 }
 export function continuation(state) {
-    const available = allEntries(state);
+    const available = [...allEntries(state), ...Object.values(state.definitions).filter(r => parseDailyId(r.def.id)).map(r => ({ ...r, packId: 'daily' }))];
     const saved = Object.entries(state.progress).filter(([, p]) => !p.solved).sort((a, b) => b[1].updatedAt - a[1].updatedAt);
     for (const [gameKey, p] of saved) {
         const matches = available.filter(e => e.gameKey === gameKey);
@@ -113,7 +115,11 @@ export async function validateBackup(file) {
         if (!byGame.has(key) || !validSavedState(byGame.get(key), saved?.state) || typeof saved.solved !== 'boolean'
             || !Number.isSafeInteger(saved.updatedAt) || saved.updatedAt < 0 || !(saved.context === null || typeof saved.context === 'string')) throw new Error('Backup has invalid saved progress.');
     }
-    for (const [k, v] of Object.entries(s.preferences)) if (!['reduced-motion', 'help-seen'].includes(k) || typeof v !== 'boolean') throw new Error('Backup has unsupported settings.');
+    for (const [k, v] of Object.entries(s.preferences)) {
+        const valid = k === 'theme' ? validThemePreference(v)
+            : ['reduced-motion', 'help-seen', 'daily-allow-flip', 'generator-allow-flip'].includes(k) && typeof v === 'boolean';
+        if (!valid) throw new Error('Backup has unsupported settings.');
+    }
     // Reserved, separate draft data is never interpreted as playable content.
     return structuredClone(s);
 }

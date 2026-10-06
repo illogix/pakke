@@ -130,6 +130,7 @@ function checkField(def, errors) {
     };
 
     outside(def.container.cells, 'container');
+    outside(def.container.holes ?? [], 'container holes');
 
     for (const piece of def.pieces) {
         outside(placedCells(piece, piece.start), `piece "${piece.id}"`);

@@ -1,6 +1,9 @@
 import { portableSHA256 } from './hash.js';
 import { validatePuzzle } from '../core/validate.js';
 
+export const SUPPORTED_FEATURES = ['board-labels', 'visible-holes', 'flipped-color'];
+const unsupportedFeatures = value => value !== undefined && (!Array.isArray(value) || value.some(f => !SUPPORTED_FEATURES.includes(f)));
+
 export const LIMITS = { importBytes: 10 * 1024 ** 2, backupBytes: 50 * 1024 ** 2, definitions: 2000, cells: 500000 };
 export const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 export const validId = value => typeof value === 'string' && /^[a-z0-9][a-z0-9_-]{0,79}$/.test(value)
@@ -20,6 +23,7 @@ const cells = value => [...value].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
 export function gameplay(def) {
     return { id: def.id, schemaVersion: def.schemaVersion, type: def.type, field: def.field,
         container: cells(def.container.cells), rules: def.rules,
+        ...(def.container.holes?.length ? { visibleHoles: cells(def.container.holes) } : {}),
         pieces: def.pieces.map(p => ({ id: p.id, cells: cells(p.cells), start: p.start, locked: p.locked }))
             .sort((a, b) => a.id.localeCompare(b.id)) };
 }
@@ -48,7 +52,7 @@ export function validateDefinitions(defs) {
     for (const def of defs) {
         if (def?.draft || def?.kind === 'draft') { errors.push('Drafts need an editor and cannot be installed as playable puzzles.'); continue; }
         const name = typeof def?.meta?.name === 'string' ? def.meta.name : def?.id || 'Puzzle';
-        if (def?.requiredFeatures !== undefined && (!Array.isArray(def.requiredFeatures) || def.requiredFeatures.length)) errors.push(`${name}: unsupported required features.`);
+        if (unsupportedFeatures(def?.requiredFeatures)) errors.push(`${name}: unsupported required features.`);
         const result = validatePuzzle(def);
         errors.push(...result.errors.map(e => `${name}: ${e}`));
         warnings.push(...result.warnings.map(w => `${name}: ${w}`));
@@ -56,10 +60,10 @@ export function validateDefinitions(defs) {
             const unknownRules=Object.keys(def.rules).filter(key=>!['allowRotation','allowFlip','completion'].includes(key));
             if(unknownRules.length) errors.push(`${name}: unsupported rules: ${unknownRules.join(', ')}.`);
             for(const piece of def.pieces) {
-                const unknown=Object.keys(piece).filter(key=>!['id','cells','color','start','locked','meta'].includes(key));
+                const unknown=Object.keys(piece).filter(key=>!['id','cells','color','flippedColor','start','locked','meta'].includes(key));
                 if(unknown.length) errors.push(`${name}: piece ${piece.id} has unsupported features: ${unknown.join(', ')}.`);
             }
-            area += def.container.cells.length + def.pieces.reduce((sum, p) => sum + p.cells.length, 0);
+            area += def.container.cells.length + (def.container.holes?.length ?? 0) + def.pieces.reduce((sum, p) => sum + p.cells.length, 0);
             if (def.meta !== undefined && !isObject(def.meta)) errors.push(`${name}: metadata must be an object.`);
             for (const key of ['name', 'author', 'description', 'contributor', 'attribution', 'source', 'license', 'catalogNumber']) {
                 const value = def.meta?.[key];
@@ -75,7 +79,7 @@ export async function inspectContent(data) {
     if (!isObject(data)) throw new Error('Expected a pack or puzzle object.');
     if (data.draft || data.kind === 'draft') throw new Error('This is an authoring draft. A future editor is needed to open it.');
     if (data.backupVersion !== undefined) throw new Error('This is a personal backup. Use Restore backup in Settings.');
-    if (data.requiredFeatures !== undefined && (!Array.isArray(data.requiredFeatures) || data.requiredFeatures.length)) throw new Error('This file requires unsupported features.');
+    if (unsupportedFeatures(data.requiredFeatures)) throw new Error('This file requires unsupported features.');
     const standalone = data.schemaVersion !== undefined && data.packVersion === undefined;
     if (!standalone) {
         if (data.packVersion !== 1) throw new Error('Unsupported pack format. Expected packVersion 1.');
