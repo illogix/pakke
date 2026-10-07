@@ -20,12 +20,12 @@ export class CalendarUI {
     }
     homeSection() {
         const section = this.shell.library.section('Daily puzzle', this.control());
-        const row = element('div', '', 'daily-actions');
+        const row = element('div', '', 'action-row');
         const today = this.shell.library.action('Today’s puzzle', () => this.openDate(localDate()), 'primary-button');
         today.dataset.today = ''; today.disabled = !parseDate(localDate());
         if (today.disabled) today.title = 'Daily puzzles are available for 2026';
         const calendar = iconButton('calendar', 'Daily Calendar Puzzles', () => this.show());
-        calendar.classList.add('calendar-button'); row.append(today, calendar); section.append(row); return section;
+        calendar.classList.add('square-action'); row.append(today, calendar); section.append(row); return section;
     }
     show(month = this.month, push = true) {
         this.month = Number.isInteger(month) && month >= 1 && month <= 12 ? month : this.month;

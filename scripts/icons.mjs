@@ -6,7 +6,7 @@ import { schemes as palettes, tintedIcon } from '../src/themes/palettes.js';
 import { cssColor } from '../src/ui/theme.js';
 
 const CELL = 6, ORIGIN = 7, RADIUS = 0.6;
-const iconColors = palette => ({ page: cssColor(palette.page), blue: cssColor(palette.calendarBlue), yellow: cssColor(palette.calendarYellow) });
+const iconColors = palette => ({ page: cssColor(palette.iconGround), blue: cssColor(palette.calendarBlue), yellow: cssColor(palette.calendarYellow) });
 const schemes = {
     light: iconColors(palettes.light), dark: iconColors(palettes.dark),
     tinted: Object.fromEntries(Object.entries(tintedIcon).map(([key, value]) => [key, cssColor(value)]))

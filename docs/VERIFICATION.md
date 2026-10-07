@@ -13,16 +13,20 @@ token sets, pre-boot CSS generation, explicit palette-change notifications,
 optional face colors, and a four-color palette cycling twice across eight pieces.
 Generator checks use both four- and six-color neighbor ordering.
 
-On October 6, `npm run check` passed all 462 tests and the production build.
-The daily browser script also checks pre-boot light/dark tokens with JavaScript
-disabled, matching primary colors on Today/calendar (including hover), Home
-surface colors, live board theme changes, actual tray texture pixels, and dock
+On October 6, after the Pakke redesign, `npm run check` passed all 463 tests
+and the production build. Unit checks also cover Home's section colours taken
+from the piece palette, cycling a palette shorter than four, and the five most
+recent unfinished attempts behind Last played. The daily browser script also
+checks pre-boot light/dark tokens with JavaScript disabled, the Daily section's
+Green on Today and the calendar button with their piece-ink labels (including
+hover), Home surface colors, live board theme changes, actual tray texture pixels, and dock
 colors. Settings checks cover the System default, fixed choices ignoring OS
 changes on Home and the board, reload persistence, System following OS changes,
-and a backup restoring the applied theme. Selected controls use Surface2 over
-Surface0 in both schemes, giving them stronger contrast while keeping them
-subdued beside primary buttons. All 41 browser checks passed with no page
-errors; Home, board, and Settings screenshots were visually inspected. Screenshots include `theme-board-light.png`
+and a backup restoring the applied theme. All 41 daily browser checks passed
+with no page errors, as did the player (41), library (34), reliability (8), and
+production offline checks. Home, the history sheet, Library, and the board were
+inspected at 390×844 in both schemes; with simulated iPhone safe areas (47 px
+top, 34 px bottom) all four Home sections fit without scrolling. Screenshots include `theme-board-light.png`
 and `theme-board-dark.png`, plus `theme-settings-light.png` and
 `theme-settings-dark.png`.
 
@@ -141,7 +145,7 @@ after moving the dock to the device's bottom edge on turned touch screens.
 | Unit suite | 432 tests in 16 files passed | Core rules/geometry, camera/gesture math, workspace, validation, hashing, library revisions, migration, backup/restore, failed writes, introductory solutions, generator, starting layout, screen-shaped arrangement (spacing, workspace, best shape), tray-centred opening and tight Fit, colour-scheme tokens and piece palette, screen-horizontal flips at every orientation, and the tap/long-press decision and charged-press slop, and the dock side for each screen angle. |
 | Production build | Passed | Full application and offline service worker emitted. Vite warns about the Phaser-containing JS chunk. |
 | Player browser script | 41 checks passed | Drag/release, turn/flip, tap to select then turn, long-press flip mirroring left to right at turned pieces and rotated fields, Flip enabled while charged, kept through drift under a cell and dropped after a cell, a drag returned to its start staying a move, ownership/cancellation, touch/pinch, transforms, saved attempts, completion, tray centring on opening, tight Fit, re-arrangement on resize until the first move, the dock and More menu, the dock beside the board for each landscape turn and above it upside down, with buttons in reading order and dragging through the moved canvas, and backdrop-tap cancel, with player screenshots in both schemes. |
-| Library browser script | 34 checks passed (dev); 36 with `PRODUCTION=1` | Home steppers, Collections tree and filter sheet, layout in both schemes at four sizes, navigation and history, file import/export through group actions, duplicates and conflicts, backup into a fresh profile, removal/reimport with progress, and offline imported/bundled play. |
+| Library browser script | 34 checks passed (dev); 36 with `PRODUCTION=1` | Home steppers, Library tree and filter sheet, layout in both schemes at four sizes, navigation and history, file import/export through group actions, duplicates and conflicts, backup into a fresh profile, removal/reimport with progress, and offline imported/bundled play. |
 | Reliability browser script | 8 checks passed | 1,000-puzzle paging within a group, simulated write failure, actual stale-tab rejection, reopening, denied storage, migration, and absent SubtleCrypto. |
 
 Successful browser runs reported no page errors. A 1,000-puzzle import/preview
@@ -157,7 +161,7 @@ puzzle is open repaints the board and pieces without a reload.
 Manual check with `npm run dev`: Home shows the New puzzle steppers, which
 clamp at 3 and 9 and default to 6×6; **Generate W × H** shows a Generating
 sheet with a Cancel button, then opens a playable puzzle; the puzzle is listed
-under Generated puzzles in Collections; reloading the
+under Generated puzzles in the Library; reloading the
 `?puzzle=gen-…&pack=loose` URL resolves; solving marks it solved; generating
 the same size again yields a different puzzle. With Chrome DevTools CPU
 throttling at 6×, the app must stay responsive during a 9×9 generation and
@@ -177,7 +181,7 @@ landscape, and the dock with and without flip. On an iPhone, check the board
 clears the Dynamic Island and the dock clears the home indicator.
 Check that palette pieces repaint when the scheme changes. Include fractional dragging, selected and solved
 states, overlaps, straddling, cancellation, and reduced motion. Check focus,
-readability, and target sizes in Home, Collections, and dialogs as well as the
+readability, and target sizes in Home, Library, and dialogs as well as the
 player, in both light and dark schemes. Safari is the only browser that shows
 SF Pro Rounded; check label fit there as well as in Chrome's system font.
 

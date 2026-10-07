@@ -24,7 +24,7 @@ describe('theme', () => {
     it('keeps both schemes complete and formats colours for canvas', () => {
         expect(Object.keys(schemes.dark)).toEqual(Object.keys(schemes.light));
         for (const scheme of Object.values(schemes)) expect(scheme.pieces.length).toBeGreaterThan(0);
-        expect(cssColor(schemes.light.page)).toBe('#eff1f5');
+        expect(cssColor(schemes.light.page)).toBe('#dce0e8');
         expect(rgba(schemes.dark.ink, 0.06)).toBe('rgba(205,214,244,0.06)');
     });
     it('cycles a four-color theme twice over eight uncolored pieces', () => {
@@ -48,7 +48,10 @@ describe('theme', () => {
         for (const palette of Object.values(schemes)) {
             for (const [key, value] of Object.entries(cssTokens(palette))) expect(css).toContain(`${key}:${value}`);
             expect(cssTokens(palette)['--panel']).toBe(cssColor(palette.panel));
+            expect(cssTokens(palette)['--accent-4']).toBe(cssColor(palette.pieces[3]));
         }
+        const short = cssTokens({ ...schemes.light, pieces: [0x112233, 0x445566] });
+        expect([short['--accent-1'], short['--accent-3']]).toEqual(['#112233', '#112233']);
         expect(css).toContain('@media(prefers-color-scheme:dark)');
     });
     it('resolves flip-side colors, including symmetric shapes, without shifting the palette', () => {

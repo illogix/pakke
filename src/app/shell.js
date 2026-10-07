@@ -177,7 +177,7 @@ export class Shell {
             const row=text('div','','sheet-actions');
             if(this.context==='daily')row.append(this.library.action('Daily Calendar Puzzles',()=>this.leaveCalendar(),'text-button primary'));
             if(next)row.append(this.library.action('Next puzzle',()=>this.library.play(next),'text-button primary'));
-            row.append(pack?this.library.action('Collections',()=>this.leave(this.context)):this.library.action('Home',()=>this.leave()));
+            row.append(pack?this.library.action('Library',()=>this.leave(this.context)):this.library.action('Home',()=>this.leave()));
             body.append(row);
         });
     }

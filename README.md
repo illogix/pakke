@@ -71,13 +71,13 @@ available from the More (⋯) button below the board.
 **Today’s puzzle** on Home opens the daily calendar board for your local date.
 Choose **No flips** or **Flips allowed** before opening it, or use the calendar
 button to browse any date in 2026. Blue/yellow dots record progress independently
-for the two modes; daily puzzles are separate from Collections.
+for the two modes; daily puzzles are separate from the Library.
 
 **Generate W × H** on Home builds a new rectangular puzzle with
 exactly one solution, from 3×3 up to 9×9, and saves it under Generated puzzles.
 Choose whether pieces can flip. Generation runs in a background worker and can be cancelled.
 
-Import a pack or standalone puzzle from the bottom of Collections. Preview the
+Import a pack or standalone puzzle from the bottom of the Library (**Browse library** on Home). Preview the
 file before adding it; export a pack from its "…" actions and a puzzle from Help. Removing a pack retains its progress
 for reimport. Settings provides backup/restore and a separate erase-progress
 action. Content exports exclude personal progress; backups include it.

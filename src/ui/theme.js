@@ -10,12 +10,14 @@ let preference = 'system';
 export function cssTokens(palette) {
     const tokens = {
         bg: 'page', panel: 'panel', field: 'field', hairline: 'grid', ink: 'ink', secondary: 'secondary',
-        hover: 'hover', pressed: 'pressed', started: 'started', 'selected-bg': 'selectedBg',
-        'primary-bg': 'primaryBg', 'primary-ink': 'primaryInk',
+        hover: 'hover', pressed: 'pressed', started: 'started', 'selected-bg': 'selectedBg', track: 'track', divider: 'divider',
+        'primary-bg': 'primaryBg', 'primary-ink': 'primaryInk', 'accent-ink': 'pieceInk', wordmark: 'wordmark',
         'calendar-blue': 'calendarBlue', 'calendar-yellow': 'calendarYellow'
     };
     return {
         ...Object.fromEntries(Object.entries(tokens).map(([name, key]) => [`--${name}`, cssColor(palette[key])])),
+        // Home's sections take the first four piece colours, cycling a shorter palette.
+        ...Object.fromEntries([1, 2, 3, 4].map(n => [`--accent-${n}`, cssColor(palette.pieces[(n - 1) % palette.pieces.length])])),
         '--scrim': rgba(palette.scrim, palette.scrimAlpha),
         '--sheet-shadow': rgba(palette.sheetShadow, palette.sheetShadowAlpha)
     };

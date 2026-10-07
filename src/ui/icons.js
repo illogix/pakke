@@ -38,9 +38,11 @@ const paths = {
 };
 // GearAlt is drawn 4 units in from the corner of its viewBox.
 const offsets = { settings: 'translate(4 4)' };
-// Started: a half-filled circle, not a Framework7 glyph.
+// Started: a half-filled circle, not a Framework7 glyph. History: a clock with a
+// counter-clockwise arrow, the usual mark for recently played.
 const custom = {
     calendar: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 10h18M7 14h2m3 0h2m3 0h0M7 18h2m3 0h2"/></svg>',
+    history: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg>',
     started: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 1.4a6.6 6.6 0 0 1 0 13.2Z" fill="currentColor"/></svg>'
 };
 export function icon(name) {

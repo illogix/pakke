@@ -61,7 +61,7 @@ try {
             assert.equal(values.panel,'#'+schemes[scheme].panel.toString(16).padStart(6,'0'));checks++;
         } finally {await boot.close();}
     }
-    await home(); await layout(); assert.equal(await page.locator('.daily-actions button').count(),2);
+    await home(); await layout(); assert.equal(await page.locator('[data-accent="2"] .action-row button').count(),2);
     assert(await group().getByRole('radio',{name:'No flips',exact:true}).isChecked());
     await page.locator('[data-today]').click(); await player();
     assert.equal(await scene(s=>s.def.rules.allowFlip),false); assert.equal(await page.getByRole('button',{name:'Flip',exact:true}).count(),0);
@@ -114,13 +114,13 @@ try {
         await page.getByRole('button',{name:'Home',exact:true}).click();
         const surfaces=await page.evaluate(()=>{
             const color=selector=>getComputedStyle(document.querySelector(selector)).backgroundColor;
-            return {page:color('body'),panel:color('.stepper'),today:color('[data-today]'),calendar:color('.calendar-button'),calendarInk:getComputedStyle(document.querySelector('.calendar-button')).color,selected:color('.mode-control label:has(input:checked)')};
+            return {page:color('body'),stepper:color('.stepper'),today:color('[data-today]'),calendar:color('[data-accent="2"] .square-action'),calendarInk:getComputedStyle(document.querySelector('[data-accent="2"] .square-action')).color,selected:color('.mode-control label:has(input:checked)')};
         });
         const rgb=n=>`rgb(${n>>16&255}, ${n>>8&255}, ${n&255})`;
         const palette=schemes[scheme];
-        assert.equal(surfaces.page,rgb(palette.page));assert.equal(surfaces.panel,rgb(palette.panel));assert.equal(surfaces.selected,rgb(palette.selectedBg));
-        assert.equal(surfaces.today,surfaces.calendar);assert.equal(surfaces.calendar,rgb(palette.primaryBg));assert.equal(surfaces.calendarInk,rgb(palette.primaryInk));
-        await page.locator('.calendar-button').hover();assert.equal(await page.locator('.calendar-button').evaluate(e=>getComputedStyle(e).backgroundColor),surfaces.today);checks++;
+        assert.equal(surfaces.page,rgb(palette.page));assert.equal(surfaces.stepper,rgb(palette.selectedBg));assert.equal(surfaces.selected,rgb(palette.selectedBg));
+        assert.equal(surfaces.today,surfaces.calendar);assert.equal(surfaces.calendar,rgb(palette.pieces[1]));assert.equal(surfaces.calendarInk,rgb(palette.pieceInk));
+        await page.locator('[data-accent="2"] .square-action').hover();assert.equal(await page.locator('[data-accent="2"] .square-action').evaluate(e=>getComputedStyle(e).backgroundColor),surfaces.today);checks++;
         await page.getByRole('button',{name:'Daily Calendar Puzzles',exact:true}).click();
     }
     await page.locator('[data-date="2026-10-06"]').click();await player();
@@ -145,7 +145,7 @@ try {
     await gen.getByRole('radio',{name:'No flips',exact:true}).check(); await page.locator('[data-generate]').click(); await player();
     assert.equal(await scene(s=>s.def.rules.allowFlip),false); checks++;
     await page.getByRole('button',{name:'More',exact:true}).click(); await page.getByRole('button',{name:'Home',exact:true}).click();
-    await page.getByRole('button',{name:/Hand-made sets/}).click();
+    await page.getByRole('button',{name:'Browse library',exact:true}).click();
     assert.equal(await page.locator('.group').count(),3); // Daily mode has no collection.
     await page.getByRole('button',{name:'Home',exact:true}).click();
     await page.getByRole('button',{name:'Settings',exact:true}).click();

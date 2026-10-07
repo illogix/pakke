@@ -24,7 +24,7 @@ async function state() {
 }
 async function home() { await page.goto(base); await page.getByRole('heading', { name: 'Pakke', exact: true }).waitFor(); }
 const group = name => page.locator('.group').filter({ has: page.locator('.group-name', { hasText: name }) });
-async function collectionsPage() { await page.getByRole('button', { name: /Hand-made sets/ }).click(); await page.getByRole('heading', { name: 'Collections', exact: true }).waitFor(); }
+async function collectionsPage() { await page.getByRole('button', { name: 'Browse library', exact: true }).click(); await page.getByRole('heading', { name: 'Library', exact: true }).waitFor(); }
 async function expand(name) { const toggle = group(name).locator('.group-toggle'); if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click(); }
 async function expanded(name) { await group(name).locator('.group-toggle[aria-expanded="true"]').waitFor(); }
 async function sheetButton(name) { await page.locator('#sheet').getByRole('button', { name, exact: true }).click(); }
@@ -70,7 +70,7 @@ try {
     await collectionsPage(); assert.equal(await page.getByRole('searchbox').inputValue(), 'little'); assert.equal(await page.locator('.puzzle-row').count(), 1);
     await page.getByRole('button', { name: 'Filter and sort', exact: true }).click(); assert.equal(await page.getByLabel('Sort', { exact: true }).inputValue(), 'name');
     await page.getByLabel('Sort', { exact: true }).selectOption('authored'); await close(); await page.getByRole('searchbox').fill(''); checks++;
-    await page.goBack(); await page.getByRole('heading', { name: 'Pakke', exact: true }).waitFor(); await page.goBack(); await page.locator('#controls .dock').waitFor(); await page.goBack(); await page.getByRole('heading', { name: 'Collections', exact: true }).waitFor(); checks++;
+    await page.goBack(); await page.getByRole('heading', { name: 'Pakke', exact: true }).waitFor(); await page.goBack(); await page.locator('#controls .dock').waitFor(); await page.goBack(); await page.getByRole('heading', { name: 'Library', exact: true }).waitFor(); checks++;
     await home();
     // Invalid import changes no catalog or progress.
     const before = await state(), broken = pack(); broken.puzzles[0].pieces = [];

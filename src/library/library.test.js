@@ -6,7 +6,7 @@ import { createState, movePiece, setPlacement } from '../core/state.js';
 import { isSolved } from '../core/completion.js';
 import { createStorage } from '../app/storage.js';
 import { canonical, definitionRecord, inspectContent, parseFile } from './format.js';
-import { allEntries, applyImport, applyRestore, backupFile, collections, continuation, emptyLibrary, entries, packFile,
+import { allEntries, applyImport, applyRestore, backupFile, collections, continuation, continuations, emptyLibrary, entries, packFile,
     previewImport, previewRestore, removeCollection, saveAttempt, statusOf, validateBackup } from './model.js';
 import { LibraryRepository } from './repository.js';
 
@@ -104,6 +104,17 @@ describe('library lifecycle', () => {
         expect(continuation(state).key).toBe(b.key); state.progress[b.gameKey].solved = true;
         expect(statusOf(state, b)).toBe('Solved'); expect(continuation(state).key).toBe(a.key);
         state = removeCollection(state, 'test-pack'); expect(continuation(state)).toBeNull();
+    });
+    it('lists recent unsolved attempts newest first, up to a limit', async () => {
+        const puzzles = ['demo01', 'first-fit', 'little-turn', 'other-side', 'pent01'].map(id => clone(puzzleById(id)));
+        let state = await install(emptyLibrary(), file('test-pack', 1, puzzles));
+        entries(state, 'test-pack').forEach((e, i) => { state = saveAttempt(state, e.key, createState(e.def), 'test-pack', 10 + i); });
+        const ids = list => list.map(e => e.def.id);
+        expect(ids(continuations(state))).toEqual(['pent01', 'other-side', 'little-turn', 'first-fit', 'demo01']);
+        expect(ids(continuations(state, 2))).toEqual(['pent01', 'other-side']);
+        state.progress[entries(state, 'test-pack')[4].gameKey].solved = true;
+        expect(ids(continuations(state))).toEqual(['other-side', 'little-turn', 'first-fit', 'demo01']);
+        expect(continuations(emptyLibrary())).toEqual([]);
     });
 });
 

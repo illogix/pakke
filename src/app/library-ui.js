@@ -2,11 +2,12 @@ import { parseDailyId } from '../daily/calendar.js';
 import { bounds } from '../core/geometry.js';
 import { storage } from './storage.js';
 import { parseFile, inspectContent } from '../library/format.js';
-import { applyImport, applyRestore, allEntries, backupFile, collections, continuation, entries, packFile,
+import { applyImport, applyRestore, allEntries, backupFile, collections, continuations, entries, packFile,
     previewImport, previewRestore, removeCollection, statusOf, validateBackup } from '../library/model.js';
 import { newPuzzleSection } from './generate-ui.js';
 import { icon, iconButton } from '../ui/icons.js';
 import { silhouetteLoops } from '../ui/silhouette.js';
+import { wordmark } from '../ui/wordmark.js';
 import { setThemePreference } from '../ui/theme.js';
 import { THEME_CHOICES, themePreference } from '../themes/preferences.js';
 
@@ -75,41 +76,53 @@ export class LibraryUI {
         heading.id = `section-${label.toLowerCase().replace(/\W+/g, '-')}`; section.setAttribute('aria-labelledby', heading.id);
         section.append(heading, ...children); return section;
     }
-    row(title, meta, run) {
-        const button = this.action('', run, 'row');
-        button.append(element('span', title, 'row-title'), element('span', meta, 'meta')); button.insertAdjacentHTML('beforeend', icon('next'));
-        return button;
-    }
 
+    /** Home's sections each take one piece colour for their buttons, in order. */
+    accentSection(label, accent, ...children) {
+        const section = this.section(label, ...children); section.dataset.accent = String(accent); return section;
+    }
     home(push = true) {
         this.show('home', 'Home', {}, push);
         const main = element('div', '', 'page home'), header = element('header', '', 'home-header');
-        header.append(element('h1', 'Pakke', 'wordmark'), iconButton('settings', 'Settings', () => this.settings()));
+        const title = element('h1', '', 'wordmark'); title.append(element('span', 'Pakke', 'sr-only')); title.insertAdjacentHTML('beforeend', wordmark());
+        const row = element('div', '', 'home-title'); row.append(title, iconButton('settings', 'Settings', () => this.settings()));
+        header.append(row);
         main.append(header);
         if (this.shell.storageNotice) main.append(element('p', this.shell.storageNotice, 'notice'));
-        const resume = continuation(this.state);
-        if (resume) {
-            const pack = collections(this.state).find(p => p.id === resume.packId);
-            const row = this.row(resume.def.meta?.name || resume.def.id, resume.packId === 'daily' ? 'Daily Calendar Puzzles' : pack?.name || '', () => this.play(resume));
-            row.dataset.continue = ''; main.append(this.section('Continue', row));
-        }
-        main.append(this.shell.calendar.homeSection(), newPuzzleSection(this.shell, this));
-        const sets = collections(this.state).filter(p => p.id !== 'loose'), count = sets.reduce((n, p) => n + p.keys.length, 0);
-        main.append(this.section('Collections', this.row('Hand-made sets', `${plural(sets.length, 'set')} · ${plural(count, 'puzzle')}`, () => this.collections())));
+        const recent = continuations(this.state);
+        if (recent.length) main.append(this.lastPlayed(recent[0]));
+        const daily = this.shell.calendar.homeSection(), generator = newPuzzleSection(this.shell, this);
+        daily.dataset.accent = '2'; generator.dataset.accent = '3';
+        main.append(daily, generator, this.accentSection('Library', 4, this.action('Browse library', () => this.collections(), 'primary-button')));
         this.restore(main);
+    }
+    lastPlayed(record) {
+        const details = element('p', '', 'last-played');
+        details.append(element('span', record.def.meta?.name || record.def.id, 'last-played-name'), element('span', this.setName(record), 'meta'));
+        const resume = this.action('Continue puzzle', () => this.play(record), 'primary-button'); resume.dataset.continue = '';
+        const history = iconButton('history', 'Recent puzzles', () => this.recent()); history.classList.add('square-action');
+        const row = element('div', '', 'action-row'); row.append(resume, history);
+        return this.accentSection('Last played', 1, details, row);
+    }
+    /** The five most recent unsolved puzzles; choosing one opens it. */
+    recent() {
+        this.shell.showSheet('Recent puzzles', body => { for (const record of continuations(this.state)) body.append(this.choiceRow(record)); });
+    }
+    setName(record) {
+        return record.packId === 'daily' ? 'Calendar Puzzles' : collections(this.state).find(p => p.id === record.packId)?.name || '';
     }
 
     collections(packId = null, push = true) {
         const view = this.view;
         if (packId) { view.expanded.add(packId); this.scroll.delete('collections'); }
-        this.show('collections', 'Collections', packId ? { view: 'collections', pack: packId } : { view: 'collections' }, push);
+        this.show('collections', 'Library', packId ? { view: 'collections', pack: packId } : { view: 'collections' }, push);
         const main = element('div', '', 'page collections');
         const back = this.action('Home', () => this.home(), 'back-link'); back.insertAdjacentHTML('afterbegin', icon('back'));
-        main.append(back, element('h1', 'Collections', 'page-title'));
+        main.append(back, element('h1', 'Library', 'page-title'));
         const controls = element('div', '', 'search-row'), label = element('label', '', 'search');
-        label.insertAdjacentHTML('beforeend', icon('search')); label.append(element('span', 'Search collections', 'sr-only'));
+        label.insertAdjacentHTML('beforeend', icon('search')); label.append(element('span', 'Search library', 'sr-only'));
         const search = document.createElement('input'); search.type = 'search'; search.placeholder = 'Search'; search.value = view.query;
-        search.setAttribute('aria-label', 'Search collections'); label.append(search);
+        search.setAttribute('aria-label', 'Search library'); label.append(search);
         const filter = iconButton('filter', 'Filter and sort', () => this.filterSheet(() => { render(); mark(); }));
         filter.classList.add('filter-button');
         const mark = () => { const on = view.filter !== 'All' || view.sort !== 'authored'; filter.classList.toggle('is-active', on); filter.setAttribute('aria-pressed', String(on)); };
@@ -174,7 +187,7 @@ export class LibraryUI {
     choiceRow(record) {
         const button = this.action('', () => this.play(record), 'choice-row');
         button.append(trayThumbnail(record.def, statusOf(this.state, record)), element('span', record.def.meta?.name || record.def.id, 'puzzle-name'),
-            element('span', collections(this.state).find(p => p.id === record.packId)?.name || '', 'meta'));
+            element('span', this.setName(record), 'meta'));
         return button;
     }
     filterSheet(changed) {

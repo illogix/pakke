@@ -164,7 +164,7 @@ choice before the player boots. Existing backups without `theme` remain valid.
 Daily puzzles have no pack or loose membership. Their deterministic definitions
 are retained on demand in `definitions`, and attempts use `progress` with
 context `daily`. They are included in backups and progress clearing. The daily
-calendar and Continue read these records directly; Collections ignores them.
+calendar and Last played read these records directly; the Library ignores them.
 Supporting 2026 requires at most 730 daily definitions. No separate database
 migration or additional store is needed. The current snapshot and
 backup versions are separate from puzzle schema and pack format versions.

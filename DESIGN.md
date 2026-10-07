@@ -25,7 +25,7 @@ Five bundled puzzles are arranged in two explicit collections:
   piece and intentional spare room.
 - **Room to think:** `pent01`, the larger pentomino challenge.
 
-A separate **Daily Calendar Puzzles** mode offers every date in 2026 with and without flipping; it does not appear in Collections.
+A separate **Daily Calendar Puzzles** mode offers every date in 2026 with and without flipping; it does not appear in the Library.
 
 The library can also **generate** new puzzles on the device; see
 [Generated puzzles](#generated-puzzles). The editor is a possible future
@@ -45,7 +45,7 @@ the source of truth for piece placements or rules.
 | `src/themes/` | Shared pure theme palettes, including variable-length piece color arrays. |
 | `src/ui/` | Camera and gesture math, colour-scheme tokens, procedural materials, silhouettes, and icons. Some rendering helpers use browser canvas/DOM APIs. |
 | `src/scenes/` | Phaser drawing, event wiring, transient selection and gesture previews. |
-| `src/app/` | Home and Collections pages, player controls/dialogs, routing, offline registration, legacy storage migration, and the generator controls with their Web Worker. |
+| `src/app/` | Home and Library pages, player controls/dialogs, routing, offline registration, legacy storage migration, and the generator controls with their Web Worker. |
 | `ios/` | Capacitor's Xcode project, which bundles the production build into a native iPhone app. Its copy of `dist/` is regenerated, not committed. |
 
 Keep these concepts separate:
@@ -236,7 +236,7 @@ transformed, or dragged, and cannot expose a piece underneath to selection.
 - Locked pieces use whole-face matte grain and faint contact shading, at normal
   brightness. No lock symbol; the treatment is distinct from invalid shading.
 - No player title or persistent puzzle-name heading. Metadata belongs in the
-  Collections tree and Help. Icon controls have accessible names, tooltips, and
+  Library tree and Help. Icon controls have accessible names, tooltips, and
   44 px minimum targets.
 - Nothing sits above the board, which keeps clear of the notch or Dynamic
   Island. Below it, one rounded dock holds Rotate left, Rotate right, Flip when
@@ -264,19 +264,31 @@ themes may follow. Surfaces are flat, with no textures, gradients, or themed
 decoration. Settings offers **System / Light / Dark**, defaulting to System.
 System follows `prefers-color-scheme` live, including an open board; fixed
 choices ignore OS changes. The choice is saved with the library and included
-in backups. Browser `theme-color` follows the applied palette too. There is no accent colour:
-solved marks and the primary button use the text colour.
+in backups. Browser `theme-color` follows the applied palette too. Home's four
+sections colour their buttons with the first four piece colours (Red, Green,
+Yellow, Blue), and the wordmark is Mauve; solved marks and primary buttons in
+sheets use the text colour.
 
 | Element | Catppuccin role | Latte | Mocha |
 | --- | --- | --- | --- |
-| Page background, piece separation edge | Base | `#eff1f5` | `#1e1e2e` |
-| Panels (rows, steppers, search, dock, menu rows) | Surface0 | `#ccd0da` | `#313244` |
-| Tray, hover | Surface1 | `#bcc0cc` | `#45475a` |
-| Hairlines, guide lines, pressed, selected toggles | Surface2 | `#acb0be` | `#585b70` |
+| Page background, piece separation edge | Crust | `#dce0e8` | `#11111b` |
+| Panels (search, dock, menu rows) | Base / Surface0 | `#eff1f5` | `#313244` |
+| Toggle track | Surface0 | `#ccd0da` | `#313244` |
+| Selected toggle option, generator steppers | Base / Surface2 | `#eff1f5` | `#585b70` |
+| Tray | Surface1 | `#bcc0cc` | `#45475a` |
+| Hover | Mantle / Surface1 | `#e6e9ef` | `#45475a` |
+| Pressed | Crust / Surface2 | `#dce0e8` | `#585b70` |
+| Hairlines, guide lines | Surface2 | `#acb0be` | `#585b70` |
+| Home section dividers | Surface2 / Surface0 | `#acb0be` | `#313244` |
 | Board dots and tray lines | Surface2 at 50% | `#acb0be` | `#585b70` |
 | Text, icons | Text | `#4c4f69` | `#cdd6f4` |
-| Secondary text | Subtext0 | `#6c6f85` | `#a6adc8` |
+| Secondary text | Subtext1 / Subtext0 | `#5c5f77` | `#a6adc8` |
 | Started thumbnails | Overlay0 | `#9ca0b0` | `#6c7086` |
+| Labels on Home's coloured buttons | Base / Crust | `#eff1f5` | `#11111b` |
+| Wordmark | Mauve | `#8839ef` | `#cba6f7` |
+| App icon ground | Base | `#eff1f5` | `#1e1e2e` |
+
+Where a cell names two roles, the first is Latte's and the second Mocha's.
 
 The piece palette is the style guide's regular terminal colours 1–6: Red,
 Green, Yellow, Blue, Pink, Teal (Latte `#d20f39 #40a02b #df8e1d #1e66f5
@@ -288,21 +300,29 @@ properties and supplies the same values to canvas/Phaser. The Vite theme plugin
 inserts generated light/dark tokens and browser theme colors into HTML before
 JavaScript boots; applying a palette then updates CSS, browser chrome, and open
 board textures together. More named palettes can use the same tokens.
-Selected segmented controls use Surface2 over their Surface0 group: lighter
-in Mocha, darker in Latte, while remaining subdued beside primary buttons. Piece palettes are nonempty arrays of any length.
+Segmented controls show the selected option brighter than its track, in bold,
+and every option label in the text colour. Piece palettes are nonempty arrays of any length;
+Home's section colours cycle a palette shorter than four.
 The generator receives the active palette length for its neighbor-color ordering.
-The calendar icon button uses the same primary background and ink as Today’s
-puzzle. Board labels use full ink for readability on the stronger tray surface.
+Each Home section's square icon button (history, calendar) matches its wide
+button. The generator's steppers are active settings, so they share the
+selected toggle surface; their buttons carry a 2 px ring in the section colour,
+filled while pressed. In Latte, Green and Yellow fall below 3:1 against their light labels;
+this was accepted for one consistent label colour. Board labels use full ink for readability on the stronger tray surface.
 Panels and buttons use a 14 px radius, the search field 12 px, and
 the dock 20 px. Touch targets are at least 44 px; the generator's
-stepper buttons are the exception at 40 px wide by 56 px tall, and the two
-steppers stack below 390 px wide so their labels never truncate.
+stepper buttons are the exception at 40 px wide by 52 px tall, and the two
+steppers stack below 390 px wide so their labels never truncate. Home's buttons
+and steppers are 52 px tall so it fits a 390×844 phone screen.
 
 One rounded typeface, varied only by size and weight:
 `ui-rounded, "SF Pro Rounded", system-ui, sans-serif`. `ui-rounded` resolves in
 Safari on Apple platforms; elsewhere the plain system font is used, and no web
-font is shipped. Icons are inlined Framework7 Icons (MIT, filled, 56-unit
-viewBox) in `src/ui/icons.js`, plus a custom half-filled circle for Started.
+font is shipped. The wordmark is "Pakke" in Baloo 2 ExtraBold (SIL Open Font
+License) converted to a single outline in `src/ui/wordmark.js`, about 49 px
+tall. Icons are inlined Framework7 Icons (MIT, filled, 56-unit viewBox) in
+`src/ui/icons.js`, plus custom stroke calendar and history glyphs and a
+half-filled circle for Started.
 
 The app icon is a Blue P piece and the Yellow domino completing its 3×3 square,
 with rounded corners and no gap at their seam, so every cell stays square, on
@@ -317,12 +337,23 @@ functional phrase ("None yet").
 
 ## Library experience and persistence
 
-**Home** shows the Pakke wordmark with a Settings button, a **Continue** row
-when an unfinished saved attempt is available, the **Daily puzzle** controls, the **New puzzle** controls (see
-[Generated puzzles](#generated-puzzles)), and one **Hand-made sets** row
-("2 sets · 5 puzzles", excluding Generated puzzles) leading to Collections.
+**Home** shows the Pakke wordmark with a Settings button above four sections,
+divided by hairlines and titled in bold:
 
-**Collections** is a collapsible tree with a search field, a compact Filter and
+- **Last played** (Red), only when an unfinished saved attempt is available:
+  the most recent puzzle's name and collection ("Calendar Puzzles" for daily
+  play), **Continue puzzle**, and a history button. History lists the five most
+  recent unfinished puzzles with their collections; choosing one opens it.
+- **Daily puzzle** (Green); see [Daily calendar puzzles](#daily-calendar-puzzles).
+- **New puzzle** (Yellow); see [Generated puzzles](#generated-puzzles).
+- **Library** (Blue): **Browse library**.
+
+The header takes the height the sections leave, between 110 and 200 px, so on
+a 390×844 phone everything fits without scrolling; smaller screens scroll. The
+wordmark and Settings button sit centred between the screen's top edge
+(including the status bar area) and the first section.
+
+**Library** is a collapsible tree with a search field, a compact Filter and
 sort button (status: All, In progress, Unsolved, Solved; sort: collection order,
 name, creator; the button is highlighted when either differs from the default),
 and **Import a collection** at the bottom. Each group shows its name and
@@ -337,19 +368,19 @@ batches of 60 per group. Scroll position, query, filters, and expanded groups
 persist while navigating in the running app. A puzzle's description, credits,
 revision notes, and Export puzzle live in the player's Help sheet.
 
-Continue resumes an available unfinished saved attempt. Solved history
+Continue puzzle resumes the most recent available unfinished saved attempt. Solved history
 is independent of the current arrangement and survives restarting a puzzle.
 A completion sheet appears once per transition to a solved board: "Solved",
 with the number left in the collection, or "<collection> complete" only when
 all its current puzzles are solved. Next follows the originating pack's order,
-even under a browsing filter; the other action returns to Collections with that
-group expanded. There are no progression locks. Home in the More menu returns to Home.
+even under a browsing filter; the other action, **Library**, returns to the Library with
+that group expanded. There are no progression locks. Home in the More menu returns to Home.
 
 Direct puzzle links remain supported. Pack context is explicit in the URL;
 ambiguous installed versions require a choice. A direct link without collection
 context offers Home rather than inventing a Next sequence. `?view=collections`
-opens Collections; a pack link without a puzzle (`?pack=<id>`) opens
-Collections with that group expanded.
+opens the Library; a pack link without a puzzle (`?pack=<id>`) opens the
+Library with that group expanded.
 
 Use text labels for import/export, management, and backup operations. Import
 previews and validates the whole file before mutation. Errors block import;
@@ -394,7 +425,7 @@ stored piece geometry, and starts have `flipped: false`.
 Definitions are derived deterministically on demand from the bundled inventory
 in `src/daily/`, then stored as ordinary revision-aware library definitions with
 no collection membership. Attempts use the existing progress map with context
-`daily`; they can appear in Continue, resume across reloads, survive Restart,
+`daily`; they can appear in Last played, resume across reloads, survive Restart,
 and participate in backups, restore, and Erase progress. The player’s More and
 Solved sheets offer a return to the calendar. Daily routes use
 `?view=daily&date=2026-10-05&flips=false`; calendar routes include month/year.

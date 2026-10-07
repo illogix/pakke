@@ -26,16 +26,20 @@ export function statusOf(state, record) {
     const saved = state.progress[record.gameKey];
     return saved?.solved ? 'Solved' : saved ? 'In progress' : 'Not started';
 }
-export function continuation(state) {
+/** Unsolved attempts that are still installed, most recently played first. */
+export function continuations(state, limit = 5) {
     const available = [...allEntries(state), ...Object.values(state.definitions).filter(r => parseDailyId(r.def.id)).map(r => ({ ...r, packId: 'daily' }))];
     const saved = Object.entries(state.progress).filter(([, p]) => !p.solved).sort((a, b) => b[1].updatedAt - a[1].updatedAt);
+    const found = [];
     for (const [gameKey, p] of saved) {
+        if (found.length >= limit) break;
         const matches = available.filter(e => e.gameKey === gameKey);
         const match = matches.find(e => e.packId === p.context) || matches[0];
-        if (match) return match;
+        if (match) found.push(match);
     }
-    return null;
+    return found;
 }
+export function continuation(state) { return continuations(state, 1)[0] ?? null; }
 export function previewImport(state, content) {
     const { standalone, file, records } = content;
     const old = standalone ? null : state.packs[file.pack.id];
