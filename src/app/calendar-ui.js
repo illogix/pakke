@@ -7,7 +7,8 @@ import { modeControl } from './mode-control.js';
 export class CalendarUI {
     constructor(shell, repo) {
         this.shell = shell; this.repo = repo;
-        this.month = parseDate(localDate())?.month ?? 1;
+        // Outside the supported year the calendar still opens on today's month.
+        this.month = new Date().getMonth() + 1;
     }
     get allowFlip() { return this.repo.state.preferences['daily-allow-flip'] === true; }
     control() {
@@ -21,9 +22,9 @@ export class CalendarUI {
     homeSection() {
         const section = this.shell.library.section('Daily puzzle', this.control());
         const row = element('div', '', 'action-row');
-        const today = this.shell.library.action('Today’s puzzle', () => this.openDate(localDate()), 'primary-button');
-        today.dataset.today = ''; today.disabled = !parseDate(localDate());
-        if (today.disabled) today.title = 'Daily puzzles are available for 2026';
+        // Outside the supported year, browse its calendar rather than offer a dead button.
+        const today = this.shell.library.action('Today’s puzzle', () => parseDate(localDate()) ? this.openDate(localDate()) : this.show(), 'primary-button');
+        today.dataset.today = '';
         const calendar = iconButton('calendar', 'Daily Calendar Puzzles', () => this.show());
         calendar.classList.add('square-action'); row.append(today, calendar); section.append(row); return section;
     }

@@ -401,7 +401,8 @@ See [the format reference](docs/LIBRARY_FORMAT.md) for precise version rules.
 Daily play is a separate mode, available for 2026 (365 dates). Home has a small
 **No flips / Flips allowed** segmented control above a wide **Today’s puzzle**
 button and a square calendar-icon button. Today uses the device's local date;
-its button is disabled outside the supported year. The mode defaults to No
+outside the supported year it opens the calendar on the current month instead.
+The mode defaults to No
 flips, is remembered in library preferences, and is shared with the calendar.
 
 **Daily Calendar Puzzles** shows the current month, previous/next arrows, a

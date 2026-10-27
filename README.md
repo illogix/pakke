@@ -110,3 +110,4 @@ screenshots are ignored test output and are not game assets.
 - [CLAUDE.md](CLAUDE.md): coding guidance and Phaser skill requirements.
 - [Library formats](docs/LIBRARY_FORMAT.md): exchange, identity, revisions, persistence, and limits.
 - [Verification](docs/VERIFICATION.md): reproducible checks and known coverage limits.
+- [Privacy policy](PRIVACY.md): what the app stores and shares (nothing leaves the device).
