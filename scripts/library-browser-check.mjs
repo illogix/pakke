@@ -98,12 +98,12 @@ try {
     const loose = structuredClone(demo); loose.id = 'standalone-test'; loose.meta.name = 'One loose puzzle'; loose.meta.catalogNumber = 'CAT-492';
     await upload(loose); await page.getByRole('button', { name: 'Add puzzle', exact: true }).click(); await page.getByRole('heading', { name: 'Saved to your library' }).waitFor(); await close();
     await home(); await collectionsPage(); await page.getByRole('searchbox').fill('CAT-492'); assert.equal(await page.locator('.puzzle-row').count(), 1); assert.equal(await group('Generated puzzles').locator('.puzzle-row').count(), 1); checks++;
-    await home(); await page.getByRole('button', { name: 'Settings', exact: true }).click(); await page.getByRole('checkbox', { name: 'Reduce motion' }).check();
-    const backup = await download(page.getByRole('button', { name: 'Back up library', exact: true })); assert.equal(backup.backupVersion, 1); assert(backup.library.preferences['reduced-motion']); await close(); checks++;
+    await home(); await page.getByRole('button', { name: 'Settings', exact: true }).click(); await page.getByRole('combobox', { name: 'Theme' }).selectOption('dark');
+    const backup = await download(page.getByRole('button', { name: 'Back up library', exact: true })); assert.equal(backup.backupVersion, 1); assert.equal(backup.library.preferences.theme, 'dark'); await close(); checks++;
     // Restore on a fresh browser profile, not just into the exporting context.
     const second = await browser.newContext({ viewport: { width: 390, height: 844 } }); const firstPage = page; page = await second.newPage(); page.on('pageerror', e => errors.push(e.message)); await home();
     await upload(backup, true); await page.getByRole('button', { name: 'Restore into library', exact: true }).click(); await page.getByRole('heading', { name: 'Backup restored' }).waitFor(); await close();
-    assert((await state()).packs['browser-pack']); assert.equal((await state()).loose.length, 1); assert((await state()).preferences['reduced-motion']); assert.deepEqual((await state()).progress,backup.library.progress); checks++;
+    assert((await state()).packs['browser-pack']); assert.equal((await state()).loose.length, 1); assert.equal((await state()).preferences.theme, 'dark'); assert.deepEqual((await state()).progress,backup.library.progress); checks++;
     await collectionsPage(); await page.getByRole('button', { name: 'A shared collection actions', exact: true }).click(); await sheetButton('Remove pack'); await sheetButton('Remove from library');
     await page.locator('#sheet:not([open])').waitFor({ state: 'attached' }); assert.equal(await group('A shared collection').count(), 0); assert(!(await state()).packs['browser-pack']); checks++;
     await upload(original);await page.getByRole('button',{name:'Add pack',exact:true}).click();await page.getByRole('heading',{name:'Saved to your library'}).waitFor();assert.equal((await state()).progress[gameKey].state.placements.bar.x,barStart.x+1);await close();checks++;

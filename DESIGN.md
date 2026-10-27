@@ -18,12 +18,13 @@ and starts from Home; hand-made collections are a secondary destination. The
 local library supports bundled and imported collections, resume, search, status
 filters, export, backups, and offline play. No account or server is needed.
 
-Five bundled puzzles are arranged in two explicit collections:
+Six bundled puzzles are arranged in two explicit collections:
 
 - **First steps:** `first-fit`, `little-turn`, `other-side`, `demo01`. The first
   three introduce placement, rotation, and flipping; the demo adds a locked
   piece and intentional spare room.
-- **Room to think:** `pent01`, the larger pentomino challenge.
+- **Standard puzzles:** `tetro01`, nine tetrominoes in a 6 × 6 square, then
+  `pent01`, the larger pentomino challenge.
 
 A separate **Daily Calendar Puzzles** mode offers every date in 2026 with and without flipping; it does not appear in the Library.
 
@@ -191,7 +192,8 @@ transformed, or dragged, and cannot expose a piece underneath to selection.
   the release candidate. Fractional preview state never triggers saves or solves.
 - On release, snap the origin to the nearest integer (`floor(value + 0.5)`,
   including negative positions), clamp the whole piece, and commit once. Visual
-  settling lasts about 110 ms, is interruptible, and honors reduced motion.
+  settling lasts about 110 ms, is interruptible, and honors the system's
+  reduced-motion setting; there is no in-app toggle.
 - Pressing a piece selects it. Releasing without dragging turns it clockwise
   if it was already selected. Once a press passes the drag threshold it is a
   move, even if it returns to its start.
@@ -365,8 +367,8 @@ and a Solved or Started status. Search covers puzzle names, creators, and
 catalog numbers, plus collection names; matching groups expand automatically.
 Filters and sorting do not change authored order or identity. Rows render in
 batches of 60 per group. Scroll position, query, filters, and expanded groups
-persist while navigating in the running app. A puzzle's description, credits,
-revision notes, and Export puzzle live in the player's Help sheet.
+persist while navigating in the running app. A puzzle's description, revision
+notes, and Export puzzle live in the player's Help sheet.
 
 Continue puzzle resumes the most recent available unfinished saved attempt. Solved history
 is independent of the current arrangement and survives restarting a puzzle.

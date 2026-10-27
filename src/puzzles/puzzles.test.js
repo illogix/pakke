@@ -20,6 +20,8 @@ describe('the bundled set', () => {
         expect(bundledPacks[0].puzzles.map(d => d.id)).toEqual(['first-fit', 'little-turn', 'other-side', 'demo01']);
         expect(nextPuzzle('other-side', 'first-steps').id).toBe('demo01');
         expect(nextPuzzle('demo01', 'first-steps')).toBeNull();
+        expect(bundledPacks[1].puzzles.map(d => d.id)).toEqual(['tetro01', 'pent01']);
+        expect(nextPuzzle('tetro01', 'classics').id).toBe('pent01');
         expect(nextPuzzle('pent01', 'classics')).toBeNull();
     });
 
@@ -46,6 +48,20 @@ describe('pent01', () => {
     });
 
     it('allows flipping, since six of the pentominoes are chiral', () => {
+        expect(def.rules.allowFlip).toBe(true);
+    });
+});
+
+describe('tetro01', () => {
+    const def = puzzleById('tetro01');
+
+    it('is an exact fit: nine tetrominoes in a 6 x 6 square', () => {
+        expect(def.pieces).toHaveLength(9);
+        expect(slack(def)).toBe(0);
+        expect(def.pieces.every((piece) => piece.cells.length === 4)).toBe(true);
+    });
+
+    it('allows flipping, like the pentominoes it leads into', () => {
         expect(def.rules.allowFlip).toBe(true);
     });
 });

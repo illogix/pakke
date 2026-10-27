@@ -3,13 +3,14 @@ import first from './first-fit.json';
 import turn from './little-turn.json';
 import flip from './other-side.json';
 import demo from './demo01.json';
+import tetro from './tetro01.json';
 import pent from './pent01.json';
 
 export const bundledPacks = [
     { packVersion: 1, pack: { id: 'first-steps', name: 'First steps', author: 'Pakke', revision: 1,
         description: 'A gentle introduction. Make room, take a turn, and see the other side.' }, puzzles: [first, turn, flip, demo] },
-    { packVersion: 1, pack: { id: 'classics', name: 'Room to think', author: 'Traditional puzzles', revision: 1,
-        description: 'Settle in with a larger packing challenge.' }, puzzles: [pent] }
+    { packVersion: 1, pack: { id: 'classics', name: 'Standard puzzles', author: 'Traditional puzzles', revision: 1,
+        description: 'Settle in with larger packing challenges.' }, puzzles: [tetro, pent] }
 ];
 export const puzzles = bundledPacks.flatMap(pack => pack.puzzles);
 export const puzzleById = id => puzzles.find(def => def.id === id);

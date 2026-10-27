@@ -155,7 +155,8 @@ choose backup versions even when local data is newer. Solved histories combine
 for matching gameplay keys. Bundled collections remain those shipped by the app.
 
 Known boolean settings are `reduced-motion`, `help-seen`, `daily-allow-flip`,
-and `generator-allow-flip`. Missing flip settings default to false for daily
+and `generator-allow-flip`. `reduced-motion` is still accepted from older
+backups but no longer has any effect. Missing flip settings default to false for daily
 play and true for generation. Optional `theme` is `"system"`, `"light"`, or
 `"dark"`; missing defaults to System. It is backed up and restored with other
 preferences. IndexedDB is authoritative; a localStorage mirror applies the

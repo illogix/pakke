@@ -187,7 +187,7 @@ export class Shell {
             for(const [title,copy] of [
                 ['Goal','Fit every piece inside the tray without overlaps.'],
                 ['Move','Drag a piece. It settles onto the grid when released.'],
-                ['Turn',`Tap a piece to select it, then tap it again to turn it clockwise${this.def?.rules.allowFlip?'. Press and hold a piece to flip it':''}. The dock buttons and keys R, Shift+R or E${this.def?.rules.allowFlip?', F':''} also work.`],
+                [this.def?.rules.allowFlip?'Rotate and flip':'Rotate',`Tap a piece to select it, then tap it again to rotate it clockwise${this.def?.rules.allowFlip?'. Press and hold a piece to flip it':''}. The dock buttons and keys R, Shift+R or E${this.def?.rules.allowFlip?', F':''} also work.`],
                 ['Marks','Darkened cells overlap or hang outside the tray. Grainy pieces are fixed in place.'],
                 ['View','Drag empty space to pan. Pinch or scroll to zoom.']
             ]) {body.append(text('h3',title),text('p',copy));}

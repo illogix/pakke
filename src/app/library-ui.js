@@ -17,7 +17,8 @@ export const element = (tag, value = '', className = '') => {
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const PAGE = 60;
 const STATUS_FILTERS = ['All', 'In progress', 'Unsolved', 'Solved'];
-const SORTS = [['authored', 'Collection order'], ['name', 'Name'], ['author', 'Creator']];
+// Sorting by creator returns once puzzles carry visible credits: ['author', 'Creator'].
+const SORTS = [['authored', 'Collection order'], ['name', 'Name']];
 
 export class LibraryUI {
     constructor(shell, repository) {
@@ -209,24 +210,19 @@ export class LibraryUI {
         if (daily) return this.shell.calendar.openDate(daily.date, daily.allowFlip);
         this.shell.open(record.def, true, record.packId, record.key);
     }
-    credits(body, meta = {}) {
-        for (const [key, label] of [['author', 'Designer'], ['contributor', 'Contributor'], ['catalogNumber', 'Catalog number'], ['attribution', 'Attribution'], ['source', 'Source'], ['license', 'License']]) if (meta[key]) body.append(element('h3', label), element('p', meta[key]));
-    }
     packActions(pack) {
         this.shell.showSheet(pack.name, body => {
             const count = plural(pack.keys.length, 'puzzle');
             body.append(element('p', [count, pack.source === 'bundled' ? 'Bundled' : pack.source === 'imported' ? `Revision ${pack.revision}` : null].filter(Boolean).join(' · '), 'secondary'));
             if (pack.source !== 'loose' && pack.description) body.append(element('p', pack.description));
-            this.credits(body, pack);
             const row = element('div', '', 'sheet-actions');
             if (pack.id !== 'loose') row.append(this.action('Export pack', () => this.exportPack(pack.id)));
             if (pack.source === 'imported' || pack.id === 'loose') row.append(this.action(pack.id === 'loose' ? 'Remove generated puzzles' : 'Remove pack', () => this.remove(pack)));
             body.append(row);
         });
     }
-    /** Credits, revision notes and export for the open puzzle; shown in Help. */
+    /** Revision notes and export for the open puzzle; shown in Help. */
     puzzleInfo(body, record) {
-        this.credits(body, record.def.meta);
         const alternatives = allEntries(this.state).filter(e => e.def.id === record.def.id && e.gameKey !== record.gameKey);
         if (alternatives.length) body.append(element('p', 'Another gameplay revision is installed in a different collection. Each revision keeps its own progress.', 'secondary'));
         const archived = Object.values(this.state.definitions).filter(e => e.def.id === record.def.id && e.gameKey !== record.gameKey && this.state.progress[e.gameKey]);
@@ -340,12 +336,9 @@ export class LibraryUI {
                 finally { select.disabled = false; }
             });
             themeField.append(document.createTextNode('Theme'), select); body.append(themeField);
-            const label = element('label', '', 'preference'), checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = this.state.preferences['reduced-motion'] === true;
-            checkbox.addEventListener('change', async () => { try { await this.preference('reduced-motion', checkbox.checked); } catch (e) { checkbox.checked = !checkbox.checked; this.error(e); } });
-            label.append(checkbox, document.createTextNode('Reduce motion')); body.append(label);
             body.append(element('h3', 'Library'));
             const row = element('div', '', 'sheet-actions');
-            row.append(this.action('Back up library', async () => { await this.repo.flush(); await this.download(backupFile(this.state), 'packing-library-backup.json'); }),
+            row.append(this.action('Back up library', async () => { await this.repo.flush(); await this.download(backupFile(this.state), 'pakke-backup.json'); }),
                 this.action('Restore backup', () => this.backupInput.click()), this.action('Erase all saved progress', () => {
                     this.shell.showSheet('Erase all saved progress?', content => {
                         content.append(element('p', 'Erases all attempts and solved history, including progress retained for removed packs and earlier revisions. Installed puzzles, settings, and drafts are kept.'));

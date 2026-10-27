@@ -1,0 +1,425 @@
+{
+    "schemaVersion": 1,
+    "id": "tetro01",
+    "type": "square-grid-packing",
+    "meta": {
+        "name": "Tetrominoes 6 x 6",
+        "author": "Pakke",
+        "description": "All seven tetrominoes, with an extra T and an extra O, tile a 6 x 6 square exactly. There are 78 distinct solutions.",
+        "tags": [
+            "tetrominoes",
+            "exact-fit"
+        ]
+    },
+    "field": {
+        "width": 13,
+        "height": 25
+    },
+    "container": {
+        "cells": [
+            [
+                3,
+                9
+            ],
+            [
+                4,
+                9
+            ],
+            [
+                5,
+                9
+            ],
+            [
+                6,
+                9
+            ],
+            [
+                7,
+                9
+            ],
+            [
+                8,
+                9
+            ],
+            [
+                3,
+                10
+            ],
+            [
+                4,
+                10
+            ],
+            [
+                5,
+                10
+            ],
+            [
+                6,
+                10
+            ],
+            [
+                7,
+                10
+            ],
+            [
+                8,
+                10
+            ],
+            [
+                3,
+                11
+            ],
+            [
+                4,
+                11
+            ],
+            [
+                5,
+                11
+            ],
+            [
+                6,
+                11
+            ],
+            [
+                7,
+                11
+            ],
+            [
+                8,
+                11
+            ],
+            [
+                3,
+                12
+            ],
+            [
+                4,
+                12
+            ],
+            [
+                5,
+                12
+            ],
+            [
+                6,
+                12
+            ],
+            [
+                7,
+                12
+            ],
+            [
+                8,
+                12
+            ],
+            [
+                3,
+                13
+            ],
+            [
+                4,
+                13
+            ],
+            [
+                5,
+                13
+            ],
+            [
+                6,
+                13
+            ],
+            [
+                7,
+                13
+            ],
+            [
+                8,
+                13
+            ],
+            [
+                3,
+                14
+            ],
+            [
+                4,
+                14
+            ],
+            [
+                5,
+                14
+            ],
+            [
+                6,
+                14
+            ],
+            [
+                7,
+                14
+            ],
+            [
+                8,
+                14
+            ]
+        ]
+    },
+    "rules": {
+        "allowRotation": true,
+        "allowFlip": true,
+        "completion": "all-pieces-contained"
+    },
+    "pieces": [
+        {
+            "id": "i",
+            "cells": [
+                [
+                    0,
+                    0
+                ],
+                [
+                    0,
+                    1
+                ],
+                [
+                    0,
+                    2
+                ],
+                [
+                    0,
+                    3
+                ]
+            ],
+            "start": {
+                "x": 3,
+                "y": 16,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "o1",
+            "cells": [
+                [
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    0
+                ],
+                [
+                    0,
+                    1
+                ],
+                [
+                    1,
+                    1
+                ]
+            ],
+            "start": {
+                "x": 5,
+                "y": 16,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "o2",
+            "cells": [
+                [
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    0
+                ],
+                [
+                    0,
+                    1
+                ],
+                [
+                    1,
+                    1
+                ]
+            ],
+            "start": {
+                "x": 8,
+                "y": 16,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "s",
+            "cells": [
+                [
+                    1,
+                    0
+                ],
+                [
+                    2,
+                    0
+                ],
+                [
+                    0,
+                    1
+                ],
+                [
+                    1,
+                    1
+                ]
+            ],
+            "start": {
+                "x": 3,
+                "y": 21,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "z",
+            "cells": [
+                [
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    0
+                ],
+                [
+                    1,
+                    1
+                ],
+                [
+                    2,
+                    1
+                ]
+            ],
+            "start": {
+                "x": 7,
+                "y": 21,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "l",
+            "cells": [
+                [
+                    0,
+                    0
+                ],
+                [
+                    0,
+                    1
+                ],
+                [
+                    0,
+                    2
+                ],
+                [
+                    1,
+                    2
+                ]
+            ],
+            "start": {
+                "x": 2,
+                "y": 5,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "j",
+            "cells": [
+                [
+                    1,
+                    0
+                ],
+                [
+                    1,
+                    1
+                ],
+                [
+                    0,
+                    2
+                ],
+                [
+                    1,
+                    2
+                ]
+            ],
+            "start": {
+                "x": 5,
+                "y": 5,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "t1",
+            "cells": [
+                [
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    0
+                ],
+                [
+                    2,
+                    0
+                ],
+                [
+                    1,
+                    1
+                ]
+            ],
+            "start": {
+                "x": 8,
+                "y": 6,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        },
+        {
+            "id": "t2",
+            "cells": [
+                [
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    0
+                ],
+                [
+                    2,
+                    0
+                ],
+                [
+                    1,
+                    1
+                ]
+            ],
+            "start": {
+                "x": 5,
+                "y": 2,
+                "rotation": 0,
+                "flipped": false
+            },
+            "locked": false
+        }
+    ]
+}

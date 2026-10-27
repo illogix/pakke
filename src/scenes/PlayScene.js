@@ -9,7 +9,6 @@ import { rotatedGrabPoint, flippedGrabPoint, mirrorIsVertical, pressAction, pres
 import { createCamera, displayCell, displayToScreen, screenToDisplay, screenToWorld, panCamera, zoomAt, reframeCamera, cameraIsInitial, clampCamera, openingState, sameView } from '../ui/camera.js';
 import { paintMaterial, paintTray } from '../ui/materials.js';
 import { pieceColor, theme, watchScheme } from '../ui/theme.js';
-import { storage } from '../app/storage.js';
 
 // Phaser owns the rendering loop. Native captured Pointer Events own gestures.
 // Only committed integer placements enter the pure core or storage.
@@ -62,7 +61,7 @@ export default class PlayScene extends Phaser.Scene {
         if(this.saved) {this.camera=reframeCamera(this.def,this.state,this.camera);this.cameraChanged();}
         this.refreshStatus();
     }
-    reducedMotion() {return storage.read('reduced-motion')===true || matchMedia('(prefers-reduced-motion: reduce)').matches;}
+    reducedMotion() {return matchMedia('(prefers-reduced-motion: reduce)').matches;}
     viewport() {return {width:Math.max(1,this.scale.width/this.pixelRatio),height:Math.max(1,this.scale.height/this.pixelRatio)};}
     resize() {
         this.cancelGesture();

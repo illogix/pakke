@@ -18,7 +18,7 @@ npm run dev
 ```
 
 Use the URL printed by Vite. The library includes First steps (four introductory
-puzzles) and Room to think (the larger pentomino challenge). Direct links such
+puzzles) and Standard puzzles (a 6 × 6 tetromino square, then the larger pentomino challenge). Direct links such
 as `/?puzzle=demo01` and `/?puzzle=pent01` still work.
 
 | Server | Command | Default port | Purpose |
@@ -64,7 +64,7 @@ and tinted app icons. It needs Playwright, set up as for the browser checks in
 ## Play and manage puzzles
 
 Drag a piece continuously and release to snap. Tap a piece to select it, tap it
-again to turn it clockwise, or hold it still until Flip lights up and release to
+again to rotate it clockwise, or hold it still until Flip lights up and release to
 flip it. The dock's controls turn and flip the selected piece. Drag empty canvas
 to pan; pinch or scroll to zoom. Reframe fits all pieces in view. Keyboard
 shortcuts: **R** clockwise, **Shift+R** or **E** counterclockwise, **F** flip
