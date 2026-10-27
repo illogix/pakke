@@ -3,6 +3,13 @@
 A mobile-friendly square-grid packing game built with Phaser 4 and Vite. The
 player and personal puzzle library run in the browser without a backend.
 
+<p align="center">
+  <img src="docs/images/title-light.png" width="190" alt="Home screen in the light theme">&nbsp;
+  <img src="docs/images/pento-light.png" width="190" alt="A pentomino puzzle with one piece left to place, in the light theme">&nbsp;
+  <img src="docs/images/title-dark.png" width="190" alt="Home screen in the dark theme">&nbsp;
+  <img src="docs/images/daily-dark.png" width="190" alt="A daily calendar puzzle with one piece left to place, in the dark theme">
+</p>
+
 ## Run locally
 
 ```sh
