@@ -25,7 +25,9 @@ export function offlinePlugin() {
 const ROOT = new URL('./', self.location).href;
 const PREFIX = 'packing-offline:' + ROOT + ':';
 const CACHE = PREFIX + '${version}';
-const FILES = ${JSON.stringify(files)}.map(path => new URL(path, ROOT).href);
+// Pages are cached under their directory URL: hosts such as Cloudflare redirect
+// /index.html to /, and a redirected response fails a navigation.
+const FILES = ${JSON.stringify(files)}.map(path => new URL(path.replace(/(^|\\/)index\\.html$/, '$1'), ROOT).href);
 self.addEventListener('install', event => event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
     try { await cache.addAll(FILES); } catch (error) { await caches.delete(CACHE); throw error; }
@@ -43,7 +45,7 @@ self.addEventListener('fetch', event => {
     if (!navigation && !FILES.includes(url.origin + url.pathname)) return;
     event.respondWith((async () => {
         const cache = await caches.open(CACHE);
-        const response = await cache.match(navigation ? new URL('index.html', ROOT).href : url.origin + url.pathname);
+        const response = await cache.match(navigation ? ROOT : url.origin + url.pathname);
         return response || fetch(event.request);
     })());
 });
