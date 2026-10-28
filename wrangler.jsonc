@@ -1,0 +1,6 @@
+// Cloudflare Workers deploy: serves the production build in dist/ as static assets.
+{
+    "name": "pakke",
+    "compatibility_date": "2026-10-01",
+    "assets": { "directory": "./dist" }
+}
