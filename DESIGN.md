@@ -473,6 +473,9 @@ neighbouring pieces in the solution avoid positions a multiple of the active
 palette length apart and so
 avoid sharing a palette colour (a bounded search may leave a rare clash).
 
+The web version is hosted on Cloudflare Workers as static assets
+(`wrangler.jsonc`) at https://pakke.illogix.dev, deployed from `main`. Builds
+also render `PRIVACY.md` to `/privacy/`, the policy URL given to the App Store.
 Production builds register a service worker that caches the complete
 application; the app never needs the network after that, so no offline status is
 shown. Development is uncached. The iOS app carries every file in its bundle, so

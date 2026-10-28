@@ -2,6 +2,7 @@
 
 A mobile-friendly square-grid packing game built with Phaser 4 and Vite. The
 player and personal puzzle library run in the browser without a backend.
+Play it at https://pakke.illogix.dev.
 
 <p align="center">
   <img src="docs/images/title-light.png" width="190" alt="Home screen in the light theme">&nbsp;
@@ -111,3 +112,4 @@ screenshots are ignored test output and are not game assets.
 - [Library formats](docs/LIBRARY_FORMAT.md): exchange, identity, revisions, persistence, and limits.
 - [Verification](docs/VERIFICATION.md): reproducible checks and known coverage limits.
 - [Privacy policy](PRIVACY.md): what the app stores and shares (nothing leaves the device).
+  Builds also publish it at `/privacy/`; the live copy is https://pakke.illogix.dev/privacy/.
